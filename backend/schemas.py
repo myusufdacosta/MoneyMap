@@ -1,4 +1,22 @@
 from pydantic import BaseModel
+from typing import Optional
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class UserRead(BaseModel):
+    id: int
+    name: str
+    email: str
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserRead
 
 class IncomeBase(BaseModel):
     source: str
@@ -38,6 +56,11 @@ class LoanBase(BaseModel):
 class LoanCreate(LoanBase):
     pass
 
+class LoanUpdate(BaseModel):
+    balance: Optional[float] = None
+    monthly_payment: Optional[float] = None
+    interest_rate: Optional[float] = None
+
 class LoanRead(LoanBase):
     id: int
     class Config:
@@ -52,6 +75,18 @@ class RecurringCreate(RecurringBase):
     pass
 
 class RecurringRead(RecurringBase):
+    id: int
+    class Config:
+        from_attributes = True
+
+class BudgetTargetBase(BaseModel):
+    category: str
+    target: float
+
+class BudgetTargetCreate(BudgetTargetBase):
+    pass
+
+class BudgetTargetRead(BudgetTargetBase):
     id: int
     class Config:
         from_attributes = True
