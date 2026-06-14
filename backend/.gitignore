@@ -1,4 +1,19 @@
+# Python
 venv/
 __pycache__/
 *.pyc
-moneymap.db
+*.db
+
+# Node
+node_modules/
+dist/
+
+# Environment files
+.env
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
