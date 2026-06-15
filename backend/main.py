@@ -1,11 +1,12 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from database import engine, get_db, Base
 import models, schemas
 from auth import hash_password, verify_password, create_token, get_current_user
 from math import ceil
+from datetime import datetime, timedelta
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,7 +23,6 @@ app.add_middleware(
 def root():
     return {"app": "MoneyMap", "status": "running"}
 
-# Auth
 @app.post("/register", response_model=schemas.Token)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     existing = db.query(models.User).filter(models.User.email == user.email).first()
@@ -45,13 +45,27 @@ def login(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 # Income
 @app.get("/income", response_model=List[schemas.IncomeRead])
-def get_income(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return db.query(models.Income).filter(models.Income.user_id == user.id).all()
+def get_income(month: Optional[int] = None, year: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    q = db.query(models.Income).filter(models.Income.user_id == user.id)
+    if month and year:
+        prefix = f"{year}-{str(month).zfill(2)}"
+        q = q.filter(models.Income.date.startswith(prefix))
+    return q.all()
 
 @app.post("/income", response_model=schemas.IncomeRead)
 def add_income(income: schemas.IncomeCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     item = models.Income(**income.model_dump(), user_id=user.id)
     db.add(item); db.commit(); db.refresh(item)
+    return item
+
+@app.put("/income/{id}", response_model=schemas.IncomeRead)
+def update_income(id: int, income: schemas.IncomeCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    item = db.query(models.Income).filter(models.Income.id == id, models.Income.user_id == user.id).first()
+    if not item: raise HTTPException(status_code=404, detail="Not found")
+    item.source = income.source
+    item.amount = income.amount
+    item.date = income.date
+    db.commit(); db.refresh(item)
     return item
 
 @app.delete("/income/{id}")
@@ -63,13 +77,29 @@ def delete_income(id: int, db: Session = Depends(get_db), user=Depends(get_curre
 
 # Expenses
 @app.get("/expenses", response_model=List[schemas.ExpenseRead])
-def get_expenses(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return db.query(models.Expense).filter(models.Expense.user_id == user.id).all()
+def get_expenses(month: Optional[int] = None, year: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    q = db.query(models.Expense).filter(models.Expense.user_id == user.id)
+    if month and year:
+        prefix = f"{year}-{str(month).zfill(2)}"
+        q = q.filter(models.Expense.date.startswith(prefix))
+    return q.all()
 
 @app.post("/expenses", response_model=schemas.ExpenseRead)
 def add_expense(expense: schemas.ExpenseCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     item = models.Expense(**expense.model_dump(), user_id=user.id)
     db.add(item); db.commit(); db.refresh(item)
+    return item
+
+@app.put("/expenses/{id}", response_model=schemas.ExpenseRead)
+def update_expense(id: int, expense: schemas.ExpenseCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    item = db.query(models.Expense).filter(models.Expense.id == id, models.Expense.user_id == user.id).first()
+    if not item: raise HTTPException(status_code=404, detail="Not found")
+    item.description = expense.description
+    item.amount = expense.amount
+    item.category = expense.category
+    item.date = expense.date
+    item.type = expense.type
+    db.commit(); db.refresh(item)
     return item
 
 @app.delete("/expenses/{id}")
@@ -141,11 +171,45 @@ def set_target(target: schemas.BudgetTargetCreate, db: Session = Depends(get_db)
     db.add(item); db.commit(); db.refresh(item)
     return item
 
+# Savings goals
+@app.get("/savings-goals", response_model=List[schemas.SavingsGoalRead])
+def get_goals(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return db.query(models.SavingsGoal).filter(models.SavingsGoal.user_id == user.id).all()
+
+@app.post("/savings-goals", response_model=schemas.SavingsGoalRead)
+def add_goal(goal: schemas.SavingsGoalCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    item = models.SavingsGoal(**goal.model_dump(), user_id=user.id)
+    db.add(item); db.commit(); db.refresh(item)
+    return item
+
+@app.put("/savings-goals/{id}", response_model=schemas.SavingsGoalRead)
+def update_goal(id: int, goal: schemas.SavingsGoalCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    item = db.query(models.SavingsGoal).filter(models.SavingsGoal.id == id, models.SavingsGoal.user_id == user.id).first()
+    if not item: raise HTTPException(status_code=404, detail="Not found")
+    item.name = goal.name
+    item.target = goal.target
+    item.saved = goal.saved
+    item.deadline = goal.deadline
+    db.commit(); db.refresh(item)
+    return item
+
+@app.delete("/savings-goals/{id}")
+def delete_goal(id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    item = db.query(models.SavingsGoal).filter(models.SavingsGoal.id == id, models.SavingsGoal.user_id == user.id).first()
+    if not item: raise HTTPException(status_code=404, detail="Not found")
+    db.delete(item); db.commit()
+    return {"ok": True}
+
 # Dashboard
 @app.get("/dashboard")
-def dashboard(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    income = db.query(models.Income).filter(models.Income.user_id == user.id).all()
-    expenses = db.query(models.Expense).filter(models.Expense.user_id == user.id).all()
+def dashboard(month: Optional[int] = None, year: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    now = datetime.now()
+    m = month or now.month
+    y = year or now.year
+    prefix = f"{y}-{str(m).zfill(2)}"
+
+    income = db.query(models.Income).filter(models.Income.user_id == user.id, models.Income.date.startswith(prefix)).all()
+    expenses = db.query(models.Expense).filter(models.Expense.user_id == user.id, models.Expense.date.startswith(prefix)).all()
     loans = db.query(models.Loan).filter(models.Loan.user_id == user.id).all()
     recurring = db.query(models.RecurringPayment).filter(models.RecurringPayment.user_id == user.id).all()
 
@@ -160,22 +224,22 @@ def dashboard(db: Session = Depends(get_db), user=Depends(get_current_user)):
     for l in loans:
         if l.monthly_payment > 0:
             months = ceil(l.balance / l.monthly_payment)
-            from datetime import datetime, timedelta
-            payoff_date = datetime.now() + timedelta(days=months * 30)
-            payoff_str = payoff_date.strftime("%b %Y")
+            payoff_date = (datetime.now() + timedelta(days=months * 30)).strftime("%b %Y")
         else:
             months = 0
-            payoff_str = "Unknown"
+            payoff_date = "Unknown"
         loan_details.append({
             "id": l.id,
             "name": l.name,
             "balance": l.balance,
             "monthly_payment": l.monthly_payment,
             "months_remaining": months,
-            "payoff_date": payoff_str
+            "payoff_date": payoff_date
         })
 
     return {
+        "month": m,
+        "year": y,
         "total_income": total_income,
         "total_expenses": total_expenses,
         "remaining": total_income - total_expenses,

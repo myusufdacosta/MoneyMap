@@ -90,3 +90,17 @@ class BudgetTargetRead(BudgetTargetBase):
     id: int
     class Config:
         from_attributes = True
+
+        class SavingsGoalBase(BaseModel):
+    name: str
+    target: float
+    saved: float
+    deadline: str
+
+class SavingsGoalCreate(SavingsGoalBase):
+    pass
+
+class SavingsGoalRead(SavingsGoalBase):
+    id: int
+    class Config:
+        from_attributes = True

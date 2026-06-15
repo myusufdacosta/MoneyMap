@@ -6,6 +6,8 @@ import Income from "./pages/Income"
 import Expenses from "./pages/Expenses"
 import Loans from "./pages/Loans"
 import Recurring from "./pages/Recurring"
+import Goals from "./pages/Goals"
+import Budget from "./pages/Budget"
 
 export default function App() {
   const [user, setUser] = useState(getUser())
@@ -22,6 +24,8 @@ export default function App() {
     { id: "expenses", label: "Expenses" },
     { id: "loans", label: "Loans" },
     { id: "recurring", label: "Recurring" },
+    { id: "budget", label: "Budget" },
+    { id: "goals", label: "Goals" },
   ]
 
   return (
@@ -31,21 +35,16 @@ export default function App() {
           <h1 className="text-2xl font-semibold text-gray-900">MoneyMap</h1>
           <p className="text-sm text-gray-500">Hey {user.name} 👋</p>
         </div>
-        <button
-          onClick={handleLogout}
-          className="text-xs text-gray-400 hover:text-gray-600 mt-1 border border-gray-200 rounded-lg px-3 py-1.5"
-        >Logout</button>
+        <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-gray-600 mt-1 border border-gray-200 rounded-lg px-3 py-1.5">Logout</button>
       </div>
 
-      <nav className="flex border-b border-gray-200 px-2">
+      <nav className="flex border-b border-gray-200 px-2 overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 py-3 text-xs font-medium transition-colors ${
-              tab === t.id
-                ? "border-b-2 border-gray-900 text-gray-900"
-                : "text-gray-400 hover:text-gray-600"
+            className={`flex-shrink-0 py-3 px-2 text-xs font-medium transition-colors ${
+              tab === t.id ? "border-b-2 border-gray-900 text-gray-900" : "text-gray-400 hover:text-gray-600"
             }`}
           >{t.label}</button>
         ))}
@@ -57,6 +56,8 @@ export default function App() {
         {tab === "expenses" && <Expenses />}
         {tab === "loans" && <Loans />}
         {tab === "recurring" && <Recurring />}
+        {tab === "budget" && <Budget />}
+        {tab === "goals" && <Goals />}
       </div>
     </div>
   )

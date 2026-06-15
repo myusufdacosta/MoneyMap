@@ -11,6 +11,11 @@ export const clearAuth = () => {
   localStorage.removeItem("user")
 }
 
+export const currentMonth = () => {
+  const now = new Date()
+  return { month: now.getMonth() + 1, year: now.getFullYear() }
+}
+
 export const api = async (path, options = {}) => {
   const token = getToken()
   const res = await fetch(`${BASE}${path}`, {
