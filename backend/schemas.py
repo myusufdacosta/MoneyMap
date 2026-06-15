@@ -91,7 +91,7 @@ class BudgetTargetRead(BudgetTargetBase):
     class Config:
         from_attributes = True
 
-        class SavingsGoalBase(BaseModel):
+class SavingsGoalBase(BaseModel):
     name: str
     target: float
     saved: float
