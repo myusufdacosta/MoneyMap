@@ -1,4 +1,4 @@
-const BASE = "http://localhost:8000"
+const BASE = "https://moneymap-5zkm.onrender.com"
 
 export const getToken = () => localStorage.getItem("token")
 export const getUser = () => JSON.parse(localStorage.getItem("user") || "null")
