@@ -11,6 +11,12 @@ export default function Expenses() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0])
   const [type, setType] = useState("Need")
   const [filter, setFilter] = useState("All")
+  const [editing, setEditing] = useState(null)
+  const [editDesc, setEditDesc] = useState("")
+  const [editAmount, setEditAmount] = useState("")
+  const [editCategory, setEditCategory] = useState("Groceries")
+  const [editDate, setEditDate] = useState("")
+  const [editType, setEditType] = useState("Need")
 
   const fetch = () => api("/expenses").then(setExpenses)
   useEffect(() => { fetch() }, [])
@@ -19,6 +25,20 @@ export default function Expenses() {
     if (!desc || !amount || !date) return
     await api("/expenses", { method: "POST", body: JSON.stringify({ description: desc, amount: parseFloat(amount), category, date, type }) })
     setDesc(""); setAmount(""); fetch()
+  }
+
+  const startEdit = (e) => {
+    setEditing(e.id)
+    setEditDesc(e.description)
+    setEditAmount(e.amount)
+    setEditCategory(e.category)
+    setEditDate(e.date)
+    setEditType(e.type)
+  }
+
+  const saveEdit = async (id) => {
+    await api(`/expenses/${id}`, { method: "PUT", body: JSON.stringify({ description: editDesc, amount: parseFloat(editAmount), category: editCategory, date: editDate, type: editType }) })
+    setEditing(null); fetch()
   }
 
   const remove = async (id) => {
@@ -67,16 +87,38 @@ export default function Expenses() {
 
       {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No expenses yet</p>}
       {filtered.map(e => (
-        <div key={e.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 mb-2">
-          <div>
-            <p className="text-sm font-medium text-gray-900">{e.description}</p>
-            <p className="text-xs text-gray-400">{e.category} · {e.date}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${e.type === "Need" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>{e.type}</span>
-            <span className="text-sm font-semibold text-gray-900">{fmt(e.amount)}</span>
-            <button onClick={() => remove(e.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
-          </div>
+        <div key={e.id} className="bg-white border border-gray-100 rounded-xl px-4 py-3 mb-2">
+          {editing === e.id ? (
+            <div className="space-y-2">
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} />
+              <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={editCategory} onChange={e => setEditCategory(e.target.value)}>
+                {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
+              <div className="flex gap-2">
+                <button onClick={() => setEditType("Need")} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${editType === "Need" ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-500"}`}>Need</button>
+                <button onClick={() => setEditType("Want")} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${editType === "Want" ? "bg-red-500 text-white border-red-500" : "border-gray-200 text-gray-500"}`}>Want</button>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => saveEdit(e.id)} className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium">Save</button>
+                <button onClick={() => setEditing(null)} className="flex-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-500">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{e.description}</p>
+                <p className="text-xs text-gray-400">{e.category} · {e.date}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${e.type === "Need" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>{e.type}</span>
+                <span className="text-sm font-semibold text-gray-900">{fmt(e.amount)}</span>
+                <button onClick={() => startEdit(e)} className="text-xs text-blue-500 hover:text-blue-700">Edit</button>
+                <button onClick={() => remove(e.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>

@@ -6,6 +6,10 @@ export default function Income() {
   const [source, setSource] = useState("")
   const [amount, setAmount] = useState("")
   const [date, setDate] = useState(new Date().toISOString().split("T")[0])
+  const [editing, setEditing] = useState(null)
+  const [editSource, setEditSource] = useState("")
+  const [editAmount, setEditAmount] = useState("")
+  const [editDate, setEditDate] = useState("")
 
   const fetch = () => api("/income").then(setIncome)
   useEffect(() => { fetch() }, [])
@@ -14,6 +18,18 @@ export default function Income() {
     if (!source || !amount || !date) return
     await api("/income", { method: "POST", body: JSON.stringify({ source, amount: parseFloat(amount), date }) })
     setSource(""); setAmount(""); fetch()
+  }
+
+  const startEdit = (i) => {
+    setEditing(i.id)
+    setEditSource(i.source)
+    setEditAmount(i.amount)
+    setEditDate(i.date)
+  }
+
+  const saveEdit = async (id) => {
+    await api(`/income/${id}`, { method: "PUT", body: JSON.stringify({ source: editSource, amount: parseFloat(editAmount), date: editDate }) })
+    setEditing(null); fetch()
   }
 
   const remove = async (id) => {
@@ -42,15 +58,30 @@ export default function Income() {
       <p className="text-sm font-medium text-gray-900 mb-3">History</p>
       {income.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No income added yet</p>}
       {income.map(i => (
-        <div key={i.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 mb-2">
-          <div>
-            <p className="text-sm font-medium text-gray-900">{i.source}</p>
-            <p className="text-xs text-gray-400">{i.date}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-green-700">{fmt(i.amount)}</span>
-            <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
-          </div>
+        <div key={i.id} className="bg-white border border-gray-100 rounded-xl px-4 py-3 mb-2">
+          {editing === i.id ? (
+            <div className="space-y-2">
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={editSource} onChange={e => setEditSource(e.target.value)} />
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} />
+              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
+              <div className="flex gap-2">
+                <button onClick={() => saveEdit(i.id)} className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium">Save</button>
+                <button onClick={() => setEditing(null)} className="flex-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-500">Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{i.source}</p>
+                <p className="text-xs text-gray-400">{i.date}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-green-700">{fmt(i.amount)}</span>
+                <button onClick={() => startEdit(i)} className="text-xs text-blue-500 hover:text-blue-700">Edit</button>
+                <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+              </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
