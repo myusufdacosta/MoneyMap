@@ -1,14 +1,10 @@
 import { useState, useEffect } from "react"
-import axios from "axios"
-
-const API = "https://moneymap-5zkm.onrender.com"
+import { api } from "../utils/api"
 
 export default function Dashboard() {
   const [data, setData] = useState(null)
 
-  useEffect(() => {
-    axios.get(`${API}/dashboard`).then(r => setData(r.data))
-  }, [])
+  useEffect(() => { api("/dashboard").then(setData) }, [])
 
   if (!data) return <p className="text-gray-400 text-sm">Loading...</p>
 
@@ -52,7 +48,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-gray-50 rounded-xl p-4">
+      {data.loan_details && data.loan_details.length > 0 && (
+        <>
+          <p className="text-sm font-medium text-gray-900 mb-3">Debt freedom dates</p>
+          {data.loan_details.map(l => (
+            <div key={l.id} className="bg-white border border-gray-100 rounded-xl p-4 mb-2">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{l.name}</p>
+                  <p className="text-xs text-gray-400">{l.months_remaining} months · paid off {l.payoff_date}</p>
+                </div>
+                <p className="text-sm font-semibold text-amber-600">{fmt(l.balance)}</p>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+
+      <div className="bg-gray-50 rounded-xl p-4 mt-4">
         <p className="text-xs text-gray-500 mb-1">Monthly recurring</p>
         <p className="text-xl font-semibold text-blue-700">{fmt(data.total_recurring)}</p>
       </div>

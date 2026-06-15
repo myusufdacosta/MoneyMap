@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
-import axios from "axios"
+import { api } from "../utils/api"
 
-const API = "https://moneymap-5zkm.onrender.com"
 const CATEGORIES = ["Groceries","Transport","Utilities","Entertainment","Medical","Loan Payment","Rent","Takeaways","Other"]
 
 export default function Expenses() {
@@ -13,17 +12,17 @@ export default function Expenses() {
   const [type, setType] = useState("Need")
   const [filter, setFilter] = useState("All")
 
-  const fetch = () => axios.get(`${API}/expenses`).then(r => setExpenses(r.data))
+  const fetch = () => api("/expenses").then(setExpenses)
   useEffect(() => { fetch() }, [])
 
   const add = async () => {
     if (!desc || !amount || !date) return
-    await axios.post(`${API}/expenses`, { description: desc, amount: parseFloat(amount), category, date, type })
+    await api("/expenses", { method: "POST", body: JSON.stringify({ description: desc, amount: parseFloat(amount), category, date, type }) })
     setDesc(""); setAmount(""); fetch()
   }
 
   const remove = async (id) => {
-    await axios.delete(`${API}/expenses/${id}`)
+    await api(`/expenses/${id}`, { method: "DELETE" })
     fetch()
   }
 
@@ -47,55 +46,22 @@ export default function Expenses() {
 
       <p className="text-sm font-medium text-gray-900 mb-3">Add expense</p>
       <div className="bg-white border border-gray-100 rounded-xl p-4 mb-5 space-y-3">
-        <input
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-          placeholder="Description"
-          value={desc}
-          onChange={e => setDesc(e.target.value)}
-        />
-        <input
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-          placeholder="Amount (R)"
-          type="number"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-        />
-        <select
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-          value={category}
-          onChange={e => setCategory(e.target.value)}
-        >
+        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)} />
+        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Amount (R)" type="number" value={amount} onChange={e => setAmount(e.target.value)} />
+        <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={category} onChange={e => setCategory(e.target.value)}>
           {CATEGORIES.map(c => <option key={c}>{c}</option>)}
         </select>
-        <input
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
-          type="date"
-          value={date}
-          onChange={e => setDate(e.target.value)}
-        />
+        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="date" value={date} onChange={e => setDate(e.target.value)} />
         <div className="flex gap-2">
-          <button
-            onClick={() => setType("Need")}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Need" ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-500"}`}
-          >Need</button>
-          <button
-            onClick={() => setType("Want")}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Want" ? "bg-red-500 text-white border-red-500" : "border-gray-200 text-gray-500"}`}
-          >Want</button>
+          <button onClick={() => setType("Need")} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Need" ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-500"}`}>Need</button>
+          <button onClick={() => setType("Want")} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Want" ? "bg-red-500 text-white border-red-500" : "border-gray-200 text-gray-500"}`}>Want</button>
         </div>
-        <button
-          onClick={add}
-          className="w-full bg-gray-900 text-white rounded-lg py-2 text-sm font-medium"
-        >Add expense</button>
+        <button onClick={add} className="w-full bg-gray-900 text-white rounded-lg py-2 text-sm font-medium">Add expense</button>
       </div>
 
       <div className="flex gap-2 flex-wrap mb-4">
         {["All", ...CATEGORIES].map(c => (
-          <button
-            key={c}
-            onClick={() => setFilter(c)}
-            className={`px-3 py-1 rounded-full text-xs border ${filter === c ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-500"}`}
-          >{c}</button>
+          <button key={c} onClick={() => setFilter(c)} className={`px-3 py-1 rounded-full text-xs border ${filter === c ? "bg-gray-900 text-white border-gray-900" : "border-gray-200 text-gray-500"}`}>{c}</button>
         ))}
       </div>
 

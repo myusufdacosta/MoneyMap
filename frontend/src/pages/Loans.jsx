@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react"
-import axios from "axios"
-
-const API = "https://moneymap-5zkm.onrender.com"
+import { api } from "../utils/api"
 
 export default function Loans() {
   const [loans, setLoans] = useState([])
@@ -10,21 +8,34 @@ export default function Loans() {
   const [balance, setBalance] = useState("")
   const [payment, setPayment] = useState("")
   const [rate, setRate] = useState("")
+  const [editing, setEditing] = useState(null)
+  const [editBalance, setEditBalance] = useState("")
+  const [editPayment, setEditPayment] = useState("")
+  const [editRate, setEditRate] = useState("")
 
-  const fetch = () => axios.get(`${API}/loans`).then(r => setLoans(r.data))
+  const fetch = () => api("/loans").then(setLoans)
   useEffect(() => { fetch() }, [])
 
   const add = async () => {
     if (!name || !orig || !balance || !payment) return
-    await axios.post(`${API}/loans`, {
-      name, original_amount: parseFloat(orig), balance: parseFloat(balance),
-      monthly_payment: parseFloat(payment), interest_rate: parseFloat(rate || 0)
-    })
+    await api("/loans", { method: "POST", body: JSON.stringify({ name, original_amount: parseFloat(orig), balance: parseFloat(balance), monthly_payment: parseFloat(payment), interest_rate: parseFloat(rate || 0) }) })
     setName(""); setOrig(""); setBalance(""); setPayment(""); setRate(""); fetch()
   }
 
+  const startEdit = (l) => {
+    setEditing(l.id)
+    setEditBalance(l.balance)
+    setEditPayment(l.monthly_payment)
+    setEditRate(l.interest_rate)
+  }
+
+  const saveEdit = async (id) => {
+    await api(`/loans/${id}`, { method: "PUT", body: JSON.stringify({ balance: parseFloat(editBalance), monthly_payment: parseFloat(editPayment), interest_rate: parseFloat(editRate) }) })
+    setEditing(null); fetch()
+  }
+
   const remove = async (id) => {
-    await axios.delete(`${API}/loans/${id}`)
+    await api(`/loans/${id}`, { method: "DELETE" })
     fetch()
   }
 
@@ -40,7 +51,7 @@ export default function Loans() {
 
       <p className="text-sm font-medium text-gray-900 mb-3">Add loan</p>
       <div className="bg-white border border-gray-100 rounded-xl p-4 mb-5 space-y-3">
-        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Loan name (Capitec, FNB…)" value={name} onChange={e => setName(e.target.value)} />
+        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Loan name" value={name} onChange={e => setName(e.target.value)} />
         <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Original amount (R)" type="number" value={orig} onChange={e => setOrig(e.target.value)} />
         <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Current balance (R)" type="number" value={balance} onChange={e => setBalance(e.target.value)} />
         <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Monthly payment (R)" type="number" value={payment} onChange={e => setPayment(e.target.value)} />
@@ -59,8 +70,24 @@ export default function Loans() {
                 <p className="text-sm font-semibold text-gray-900">{l.name}</p>
                 <p className="text-xs text-gray-400">{l.interest_rate}% interest · {fmt(l.monthly_payment)}/month</p>
               </div>
-              <button onClick={() => remove(l.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+              <div className="flex gap-2">
+                <button onClick={() => startEdit(l)} className="text-xs text-blue-500 hover:text-blue-700">Edit</button>
+                <button onClick={() => remove(l.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+              </div>
             </div>
+
+            {editing === l.id ? (
+              <div className="space-y-2 mb-3">
+                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="New balance (R)" type="number" value={editBalance} onChange={e => setEditBalance(e.target.value)} />
+                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Monthly payment (R)" type="number" value={editPayment} onChange={e => setEditPayment(e.target.value)} />
+                <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Interest rate (%)" type="number" value={editRate} onChange={e => setEditRate(e.target.value)} />
+                <div className="flex gap-2">
+                  <button onClick={() => saveEdit(l.id)} className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium">Save</button>
+                  <button onClick={() => setEditing(null)} className="flex-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-500">Cancel</button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
               <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${pct}%` }}></div>
             </div>

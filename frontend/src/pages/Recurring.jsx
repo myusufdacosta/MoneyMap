@@ -1,7 +1,5 @@
 import { useState, useEffect } from "react"
-import axios from "axios"
-
-const API = "https://moneymap-5zkm.onrender.com"
+import { api } from "../utils/api"
 
 export default function Recurring() {
   const [recurring, setRecurring] = useState([])
@@ -9,22 +7,23 @@ export default function Recurring() {
   const [amount, setAmount] = useState("")
   const [day, setDay] = useState("")
 
-  const fetch = () => axios.get(`${API}/recurring`).then(r => setRecurring(r.data))
+  const fetch = () => api("/recurring").then(setRecurring)
   useEffect(() => { fetch() }, [])
 
   const add = async () => {
     if (!name || !amount || !day) return
-    await axios.post(`${API}/recurring`, { name, amount: parseFloat(amount), day_of_month: parseInt(day) })
+    await api("/recurring", { method: "POST", body: JSON.stringify({ name, amount: parseFloat(amount), day_of_month: parseInt(day) }) })
     setName(""); setAmount(""); setDay(""); fetch()
   }
 
   const remove = async (id) => {
-    await axios.delete(`${API}/recurring/${id}`)
+    await api(`/recurring/${id}`, { method: "DELETE" })
     fetch()
   }
 
   const fmt = n => `R${Math.round(n).toLocaleString("en-ZA")}`
   const total = recurring.reduce((s, r) => s + r.amount, 0)
+  const sorted = [...recurring].sort((a, b) => a.day_of_month - b.day_of_month)
 
   return (
     <div>
@@ -41,8 +40,8 @@ export default function Recurring() {
         <button onClick={add} className="w-full bg-gray-900 text-white rounded-lg py-2 text-sm font-medium">Add recurring</button>
       </div>
 
-      {recurring.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No recurring payments yet</p>}
-      {recurring.map(r => (
+      {sorted.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No recurring payments yet</p>}
+      {sorted.map(r => (
         <div key={r.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 mb-2">
           <div>
             <p className="text-sm font-medium text-gray-900">{r.name}</p>
