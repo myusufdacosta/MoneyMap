@@ -12,6 +12,8 @@ export default function Loans() {
   const [editBalance, setEditBalance] = useState("")
   const [editPayment, setEditPayment] = useState("")
   const [editRate, setEditRate] = useState("")
+  const [calculator, setCalculator] = useState(null)
+  const [extraPayment, setExtraPayment] = useState("")
 
   const fetch = () => api("/loans").then(setLoans)
   useEffect(() => { fetch() }, [])
@@ -39,6 +41,35 @@ export default function Loans() {
     fetch()
   }
 
+  const calcPayoff = (balance, monthlyPayment, annualRate, extra = 0) => {
+    if (monthlyPayment <= 0) return { months: 0, totalInterest: 0 }
+    const monthlyRate = annualRate / 100 / 12
+    let remaining = balance
+    let months = 0
+    let totalInterest = 0
+    const payment = monthlyPayment + extra
+
+    if (monthlyRate === 0) {
+      months = Math.ceil(balance / payment)
+      return { months, totalInterest: 0 }
+    }
+
+    while (remaining > 0 && months < 1200) {
+      const interest = remaining * monthlyRate
+      totalInterest += interest
+      remaining = remaining + interest - payment
+      months++
+      if (remaining < 0) remaining = 0
+    }
+    return { months, totalInterest: Math.round(totalInterest) }
+  }
+
+  const getPayoffDate = (months) => {
+    const date = new Date()
+    date.setMonth(date.getMonth() + months)
+    return date.toLocaleDateString("en-ZA", { month: "short", year: "numeric" })
+  }
+
   const fmt = n => `R${Math.round(n).toLocaleString("en-ZA")}`
   const totalDebt = loans.reduce((s, l) => s + l.balance, 0)
 
@@ -62,7 +93,13 @@ export default function Loans() {
       {loans.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No loans added yet</p>}
       {loans.map(l => {
         const pct = Math.round(((l.original_amount - l.balance) / l.original_amount) * 100)
-        const months = l.monthly_payment > 0 ? Math.ceil(l.balance / l.monthly_payment) : 0
+        const normal = calcPayoff(l.balance, l.monthly_payment, l.interest_rate)
+        const isCalc = calculator === l.id
+        const extra = parseFloat(extraPayment) || 0
+        const withExtra = calcPayoff(l.balance, l.monthly_payment, l.interest_rate, extra)
+        const monthsSaved = normal.months - withExtra.months
+        const interestSaved = normal.totalInterest - withExtra.totalInterest
+
         return (
           <div key={l.id} className="bg-white border border-gray-100 rounded-xl p-4 mb-3">
             <div className="flex justify-between items-start mb-3">
@@ -91,11 +128,57 @@ export default function Loans() {
             <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
               <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${pct}%` }}></div>
             </div>
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className="flex justify-between text-xs text-gray-500 mb-3">
               <span>{pct}% paid off</span>
               <span className="font-semibold text-amber-600">{fmt(l.balance)} remaining</span>
-              <span>~{months} months left</span>
+              <span>Free {getPayoffDate(normal.months)}</span>
             </div>
+
+            <button
+              onClick={() => { setCalculator(isCalc ? null : l.id); setExtraPayment("") }}
+              className="text-xs text-blue-500 hover:text-blue-700 font-medium"
+            >
+              {isCalc ? "Hide calculator" : "💡 What if I pay extra?"}
+            </button>
+
+            {isCalc && (
+              <div className="mt-3 bg-gray-50 rounded-xl p-4">
+                <p className="text-xs font-medium text-gray-700 mb-2">Extra monthly payment (R)</p>
+                <input
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 bg-white"
+                  placeholder="e.g. 500"
+                  type="number"
+                  value={extraPayment}
+                  onChange={e => setExtraPayment(e.target.value)}
+                />
+
+                {extra > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-xs text-gray-500">Current payoff</span>
+                      <span className="text-xs font-medium text-gray-900">{normal.months} months · {getPayoffDate(normal.months)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-xs text-gray-500">With extra {fmt(extra)}</span>
+                      <span className="text-xs font-medium text-green-700">{withExtra.months} months · {getPayoffDate(withExtra.months)}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                      <span className="text-xs text-gray-500">Time saved</span>
+                      <span className="text-xs font-semibold text-green-700">{monthsSaved} months sooner</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-xs text-gray-500">Interest saved</span>
+                      <span className="text-xs font-semibold text-green-700">{fmt(interestSaved)}</span>
+                    </div>
+                    <div className="bg-green-50 rounded-lg p-3 mt-2">
+                      <p className="text-xs text-green-800 font-medium text-center">
+                        Paying {fmt(extra)} extra saves you {fmt(interestSaved)} in interest and clears this loan {monthsSaved} months sooner!
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )
       })}
