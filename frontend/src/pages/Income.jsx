@@ -14,11 +14,12 @@ export default function Income() {
   const fetch = () => api("/income").then(setIncome)
   useEffect(() => { fetch() }, [])
 
-  const add = async () => {
-    if (!source || !amount || !date) return
-    await api("/income", { method: "POST", body: JSON.stringify({ source, amount: parseFloat(amount), date }) })
-    setSource(""); setAmount(""); fetch()
-  }
+const remove = async (id) => {
+  const item = income.find(i => i.id === id)
+  if (!window.confirm(`Delete "${item?.source ?? "this income"}"? This can't be undone.`)) return
+  await api(`/income/${id}`, { method: "DELETE" })
+  fetch()
+}
 
   const startEdit = (i) => {
     setEditing(i.id)

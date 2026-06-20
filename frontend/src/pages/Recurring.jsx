@@ -16,10 +16,12 @@ export default function Recurring() {
     setName(""); setAmount(""); setDay(""); fetch()
   }
 
-  const remove = async (id) => {
-    await api(`/recurring/${id}`, { method: "DELETE" })
-    fetch()
-  }
+const remove = async (id) => {
+  const item = recurring.find(r => r.id === id)
+  if (!window.confirm(`Delete "${item?.name ?? "this payment"}"? This can't be undone.`)) return
+  await api(`/recurring/${id}`, { method: "DELETE" })
+  fetch()
+}
 
   const fmt = n => `R${Math.round(n).toLocaleString("en-ZA")}`
   const total = recurring.reduce((s, r) => s + r.amount, 0)

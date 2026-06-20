@@ -19,6 +19,8 @@ export default function Strategy() {
   // Simulates paying off all loans together using either the avalanche
   // (highest interest first) or snowball (smallest balance first) method.
   // Once a loan is cleared, its minimum payment "snowballs" onto the next one.
+  // neverPaidOff is true if the debt still isn't cleared after 100 years —
+  // meaning the combined payments don't outpace the combined interest.
   const simulate = (strategy, extraAmount) => {
     let working = loans.map(l => ({ ...l, remaining: l.balance, paidOffMonth: null }))
     working.sort(strategy === "avalanche"
@@ -67,7 +69,8 @@ export default function Strategy() {
       })
     }
 
-    return { totalMonths: month, totalInterest: Math.round(totalInterest), payoffOrder }
+    const neverPaidOff = working.some(l => l.remaining > 0)
+    return { totalMonths: month, totalInterest: Math.round(totalInterest), payoffOrder, neverPaidOff }
   }
 
   // Baseline: each loan paid off independently on its own minimum, no extra,
@@ -75,6 +78,7 @@ export default function Strategy() {
   const baseline = (() => {
     let totalMonths = 0
     let totalInterest = 0
+    let neverPaidOff = false
     loans.forEach(l => {
       let remaining = l.balance
       let m = 0
@@ -87,9 +91,10 @@ export default function Strategy() {
         remaining -= pay
         m++
       }
+      if (remaining > 0) neverPaidOff = true
       totalMonths = Math.max(totalMonths, m)
     })
-    return { totalMonths, totalInterest: Math.round(totalInterest) }
+    return { totalMonths, totalInterest: Math.round(totalInterest), neverPaidOff }
   })()
 
   if (loans.length === 0) {
@@ -103,8 +108,8 @@ export default function Strategy() {
 
   const totalMinimum = loans.reduce((s, l) => s + l.monthly_payment, 0)
   const totalDebt = loans.reduce((s, l) => s + l.balance, 0)
-  const monthsSaved = Math.max(baseline.totalMonths - active.totalMonths, 0)
-  const interestSaved = Math.max(baseline.totalInterest - active.totalInterest, 0)
+  const monthsSaved = !baseline.neverPaidOff && !active.neverPaidOff ? Math.max(baseline.totalMonths - active.totalMonths, 0) : null
+  const interestSaved = !baseline.neverPaidOff && !active.neverPaidOff ? Math.max(baseline.totalInterest - active.totalInterest, 0) : null
 
   return (
     <div>
@@ -127,14 +132,22 @@ export default function Strategy() {
 
       <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">If you change nothing</p>
       <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 mb-6">
-        <div className="flex justify-between text-xs">
-          <span className="text-gray-500 dark:text-gray-400">Debt-free by</span>
-          <span className="font-medium text-gray-900 dark:text-gray-50">{getPayoffDate(baseline.totalMonths)} · {baseline.totalMonths} months</span>
-        </div>
-        <div className="flex justify-between text-xs mt-2">
-          <span className="text-gray-500 dark:text-gray-400">Total interest paid</span>
-          <span className="font-medium text-red-600">{fmt(baseline.totalInterest)}</span>
-        </div>
+        {baseline.neverPaidOff ? (
+          <p className="text-xs text-red-600 dark:text-red-400 font-medium text-center">
+            ⚠️ At least one loan's minimum payment doesn't cover its interest — without extra payments, your total debt will keep growing instead of shrinking.
+          </p>
+        ) : (
+          <>
+            <div className="flex justify-between text-xs">
+              <span className="text-gray-500 dark:text-gray-400">Debt-free by</span>
+              <span className="font-medium text-gray-900 dark:text-gray-50">{getPayoffDate(baseline.totalMonths)} · {baseline.totalMonths} months</span>
+            </div>
+            <div className="flex justify-between text-xs mt-2">
+              <span className="text-gray-500 dark:text-gray-400">Total interest paid</span>
+              <span className="font-medium text-red-600">{fmt(baseline.totalInterest)}</span>
+            </div>
+          </>
+        )}
       </div>
 
       <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">Pick a strategy</p>
@@ -145,8 +158,14 @@ export default function Strategy() {
         >
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mb-1">Avalanche</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Highest interest rate first. Saves the most money.</p>
-          <p className="text-sm font-semibold text-green-700">{fmt(avalanche.totalInterest)} interest</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">{avalanche.totalMonths} months</p>
+          {avalanche.neverPaidOff ? (
+            <p className="text-xs font-semibold text-red-600">⚠️ Needs more extra to clear</p>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-green-700">{fmt(avalanche.totalInterest)} interest</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">{avalanche.totalMonths} months</p>
+            </>
+          )}
         </button>
         <button
           onClick={() => setView("snowball")}
@@ -154,16 +173,30 @@ export default function Strategy() {
         >
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mb-1">Snowball</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Smallest balance first. Builds momentum fastest.</p>
-          <p className="text-sm font-semibold text-green-700">{fmt(snowball.totalInterest)} interest</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">{snowball.totalMonths} months</p>
+          {snowball.neverPaidOff ? (
+            <p className="text-xs font-semibold text-red-600">⚠️ Needs more extra to clear</p>
+          ) : (
+            <>
+              <p className="text-sm font-semibold text-green-700">{fmt(snowball.totalInterest)} interest</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">{snowball.totalMonths} months</p>
+            </>
+          )}
         </button>
       </div>
 
-      <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 mb-6">
-        <p className="text-xs text-green-800 dark:text-green-300 font-medium text-center">
-          {view === "avalanche" ? "Avalanche" : "Snowball"} gets you debt-free {monthsSaved} months sooner and saves {fmt(interestSaved)} in interest, versus paying only the minimums.
-        </p>
-      </div>
+      {active.neverPaidOff ? (
+        <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 mb-6">
+          <p className="text-xs text-red-700 dark:text-red-400 font-medium text-center">
+            Even with {fmt(extraAmount)} extra a month, this doesn't fully clear your debt within 100 years. Try increasing the extra amount above.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 mb-6">
+          <p className="text-xs text-green-800 dark:text-green-300 font-medium text-center">
+            {view === "avalanche" ? "Avalanche" : "Snowball"} gets you debt-free {monthsSaved} months sooner and saves {fmt(interestSaved)} in interest, versus paying only the minimums.
+          </p>
+        </div>
+      )}
 
       <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">Payoff order — {view === "avalanche" ? "Avalanche" : "Snowball"}</p>
       <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl overflow-hidden">

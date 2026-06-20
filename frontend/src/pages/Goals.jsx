@@ -24,10 +24,12 @@ export default function Goals() {
     setEditing(null); fetch()
   }
 
-  const remove = async (id) => {
-    await api(`/savings-goals/${id}`, { method: "DELETE" })
-    fetch()
-  }
+const remove = async (id) => {
+  const item = goals.find(g => g.id === id)
+  if (!window.confirm(`Delete "${item?.name ?? "this goal"}"? This can't be undone.`)) return
+  await api(`/savings-goals/${id}`, { method: "DELETE" })
+  fetch()
+}
 
   const fmt = n => `R${Math.round(n).toLocaleString("en-ZA")}`
 

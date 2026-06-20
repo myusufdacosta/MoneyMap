@@ -41,10 +41,12 @@ export default function Expenses() {
     setEditing(null); fetch()
   }
 
-  const remove = async (id) => {
-    await api(`/expenses/${id}`, { method: "DELETE" })
-    fetch()
-  }
+const remove = async (id) => {
+  const item = expenses.find(x => x.id === id)
+  if (!window.confirm(`Delete "${item?.description ?? "this expense"}"? This can't be undone.`)) return
+  await api(`/expenses/${id}`, { method: "DELETE" })
+  fetch()
+}
 
   const fmt = n => `R${Math.round(n).toLocaleString("en-ZA")}`
   const filtered = filter === "All" ? expenses : expenses.filter(e => e.category === filter)
