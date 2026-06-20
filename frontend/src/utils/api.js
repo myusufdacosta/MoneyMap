@@ -16,6 +16,15 @@ export const currentMonth = () => {
   return { month: now.getMonth() + 1, year: now.getFullYear() }
 }
 
+export const getDarkMode = () => {
+  const stored = localStorage.getItem("darkMode")
+  if (stored !== null) return stored === "true"
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+}
+export const setDarkModePref = (value) => {
+  localStorage.setItem("darkMode", value)
+}
+
 export const api = async (path, options = {}) => {
   const token = getToken()
   const res = await fetch(`${BASE}${path}`, {

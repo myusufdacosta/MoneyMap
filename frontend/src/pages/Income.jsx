@@ -42,43 +42,43 @@ export default function Income() {
 
   return (
     <div>
-      <div className="bg-gray-50 rounded-xl p-4 mb-5">
-        <p className="text-xs text-gray-500 mb-1">Total this month</p>
+      <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4 mb-5">
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total this month</p>
         <p className="text-2xl font-semibold text-green-700">{fmt(total)}</p>
       </div>
 
-      <p className="text-sm font-medium text-gray-900 mb-3">Add income</p>
-      <div className="bg-white border border-gray-100 rounded-xl p-4 mb-5 space-y-3">
-        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Source (Salary, side hustle…)" value={source} onChange={e => setSource(e.target.value)} />
-        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="Amount (R)" type="number" value={amount} onChange={e => setAmount(e.target.value)} />
-        <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="date" value={date} onChange={e => setDate(e.target.value)} />
-        <button onClick={add} className="w-full bg-gray-900 text-white rounded-lg py-2 text-sm font-medium">Add income</button>
+      <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">Add income</p>
+      <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 mb-5 space-y-3">
+        <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" placeholder="Source (Salary, side hustle…)" value={source} onChange={e => setSource(e.target.value)} />
+        <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" placeholder="Amount (R)" type="number" value={amount} onChange={e => setAmount(e.target.value)} />
+        <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" type="date" value={date} onChange={e => setDate(e.target.value)} />
+        <button onClick={add} className="w-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg py-2 text-sm font-medium">Add income</button>
       </div>
 
-      <p className="text-sm font-medium text-gray-900 mb-3">History</p>
-      {income.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No income added yet</p>}
+      <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">History</p>
+      {income.length === 0 && <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">No income added yet</p>}
       {income.map(i => (
-        <div key={i.id} className="bg-white border border-gray-100 rounded-xl px-4 py-3 mb-2">
+        <div key={i.id} className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-3 mb-2">
           {editing === i.id ? (
             <div className="space-y-2">
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" value={editSource} onChange={e => setEditSource(e.target.value)} />
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} />
-              <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
+              <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" value={editSource} onChange={e => setEditSource(e.target.value)} />
+              <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" type="number" value={editAmount} onChange={e => setEditAmount(e.target.value)} />
+              <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
               <div className="flex gap-2">
-                <button onClick={() => saveEdit(i.id)} className="flex-1 bg-gray-900 text-white rounded-lg py-2 text-sm font-medium">Save</button>
-                <button onClick={() => setEditing(null)} className="flex-1 border border-gray-200 rounded-lg py-2 text-sm text-gray-500">Cancel</button>
+                <button onClick={() => saveEdit(i.id)} className="flex-1 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg py-2 text-sm font-medium">Save</button>
+                <button onClick={() => setEditing(null)} className="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg py-2 text-sm text-gray-500 dark:text-gray-400">Cancel</button>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-900">{i.source}</p>
-                <p className="text-xs text-gray-400">{i.date}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-gray-50">{i.source}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{i.date}</p>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-semibold text-green-700">{fmt(i.amount)}</span>
                 <button onClick={() => startEdit(i)} className="text-xs text-blue-500 hover:text-blue-700">Edit</button>
-                <button onClick={() => remove(i.id)} className="text-gray-300 hover:text-red-400 text-xs">✕</button>
+                <button onClick={() => remove(i.id)} className="text-gray-300 dark:text-gray-600 hover:text-red-400 text-xs">✕</button>
               </div>
             </div>
           )}
