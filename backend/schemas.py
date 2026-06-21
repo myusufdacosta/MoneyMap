@@ -104,3 +104,29 @@ class SavingsGoalRead(SavingsGoalBase):
     id: int
     class Config:
         from_attributes = True
+
+class FinancialHealth(BaseModel):
+    overall: int
+    grade: str
+    debt_score: int
+    savings_score: int
+    budget_score: int
+    emergency_score: int
+
+class QuickWins(BaseModel):
+    recommendations: list[str]
+
+class ScanRequest(BaseModel):
+    file: str  # base64 data URL — image/jpeg, image/png, or application/pdf
+
+class ScannedExpense(BaseModel):
+    description: str
+    amount: float
+    date: str
+    category: str
+    type: str
+
+class ScanResponse(BaseModel):
+    transactions: list[ScannedExpense]
+    document_type: str
+    truncated: bool = False

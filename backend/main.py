@@ -8,6 +8,17 @@ from auth import hash_password, verify_password, create_token, get_current_user
 from math import ceil
 from datetime import datetime, timedelta
 
+import os
+import json
+import base64
+from groq import Groq
+import fitz  # PyMuPDF — renders PDF pages to images server-side, since Groq's vision API only accepts images, not raw PDFs
+
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+EXPENSE_CATEGORIES = ["Groceries", "Transport", "Utilities", "Entertainment", "Medical", "Loan Payment", "Rent", "Takeaways", "Other"]
+NEED_DEFAULT_CATEGORIES = {"Groceries", "Transport", "Utilities", "Medical", "Loan Payment", "Rent"}
+MAX_PDF_PAGES = 6  # caps cost/latency on long statements; UI surfaces a "truncated" notice past this
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="MoneyMap API")
@@ -250,3 +261,310 @@ def dashboard(month: Optional[int] = None, year: Optional[int] = None, db: Sessi
         "leakage_pct": round((wants / total_expenses * 100) if total_expenses > 0 else 0, 1),
         "loan_details": loan_details
     }
+
+@app.get("/financial-health", response_model=schemas.FinancialHealth)
+def financial_health(
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    now = datetime.now()
+    m = month or now.month
+    y = year or now.year
+    prefix = f"{y}-{str(m).zfill(2)}"
+
+    income = db.query(models.Income)\
+        .filter(models.Income.user_id == user.id, models.Income.date.startswith(prefix))\
+        .all()
+
+    expenses = db.query(models.Expense)\
+        .filter(models.Expense.user_id == user.id, models.Expense.date.startswith(prefix))\
+        .all()
+
+    loans = db.query(models.Loan)\
+        .filter(models.Loan.user_id == user.id)\
+        .all()
+
+    goals = db.query(models.SavingsGoal)\
+        .filter(models.SavingsGoal.user_id == user.id)\
+        .all()
+
+    total_income = sum(i.amount for i in income)
+    total_expenses = sum(e.amount for e in expenses)
+
+    debt_payment = sum(l.monthly_payment for l in loans)
+
+    savings_balance = sum(g.saved for g in goals)
+
+    # Debt Score
+
+    if total_income > 0:
+        debt_ratio = (debt_payment / total_income) * 100
+        debt_score = max(0, min(100, round(100 - debt_ratio)))
+    else:
+        debt_score = 0
+
+    # Savings Score
+
+    if total_income > 0:
+        savings_rate = (savings_balance / total_income) * 100
+        savings_score = min(100, round(savings_rate * 5))
+    else:
+        savings_score = 0
+
+    # Budget Score
+
+    wants = sum(
+        e.amount
+        for e in expenses
+        if e.type == "Want"
+    )
+
+    leakage_pct = (
+        (wants / total_expenses) * 100
+        if total_expenses > 0
+        else 0
+    )
+
+    budget_score = max(
+        0,
+        min(100, round(100 - leakage_pct))
+    )
+
+    # Emergency Fund Score
+
+    if total_expenses > 0:
+        months_cover = savings_balance / total_expenses
+        emergency_score = min(
+            100,
+            round((months_cover / 6) * 100)
+        )
+    else:
+        emergency_score = 0
+
+    overall = round(
+        debt_score * 0.30 +
+        savings_score * 0.25 +
+        budget_score * 0.25 +
+        emergency_score * 0.20
+    )
+
+    if overall >= 90:
+        grade = "Excellent"
+    elif overall >= 75:
+        grade = "Strong"
+    elif overall >= 60:
+        grade = "Fair"
+    elif overall >= 40:
+        grade = "At Risk"
+    else:
+        grade = "Critical"
+
+    return {
+        "overall": overall,
+        "grade": grade,
+        "debt_score": debt_score,
+        "savings_score": savings_score,
+        "budget_score": budget_score,
+        "emergency_score": emergency_score
+    }
+@app.get("/quick-wins", response_model=schemas.QuickWins)
+def quick_wins(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    recommendations = []
+
+    loans = db.query(models.Loan)\
+        .filter(models.Loan.user_id == user.id)\
+        .all()
+
+    expenses = db.query(models.Expense)\
+        .filter(models.Expense.user_id == user.id)\
+        .all()
+
+    goals = db.query(models.SavingsGoal)\
+        .filter(models.SavingsGoal.user_id == user.id)\
+        .all()
+
+    if len(goals) == 0:
+        recommendations.append(
+            "Add a savings goal to improve your Financial Health score"
+        )
+
+    wants = [e for e in expenses if e.type == "Want"]
+
+    if len(expenses) > 0 and len(wants) == len(expenses):
+        recommendations.append(
+            "Categorise expenses as Needs and Wants for better insights"
+        )
+
+    if loans:
+        highest = max(loans, key=lambda l: l.balance)
+
+        recommendations.append(
+            f"Pay an extra R500 toward {highest.name} to reduce debt faster"
+        )
+
+    if not recommendations:
+        recommendations.append(
+            "Great work. Your finances are on track this month."
+        )
+
+    return {
+        "recommendations": recommendations
+    }
+# Receipt / bank statement scanning
+# Receipt / bank statement scanning
+@app.post("/scan-receipt", response_model=schemas.ScanResponse)
+def scan_receipt(payload: schemas.ScanRequest, user=Depends(get_current_user)):
+    if not GROQ_API_KEY:
+        raise HTTPException(status_code=500, detail="Receipt scanning isn't configured on the server yet (missing GROQ_API_KEY).")
+
+    file_data = payload.file
+    if not file_data or not file_data.startswith("data:") or "," not in file_data:
+        raise HTTPException(status_code=400, detail="No valid file was provided.")
+
+    header, b64data = file_data.split(",", 1)
+    is_pdf = "application/pdf" in header
+    is_image = header.startswith("data:image")
+
+    if not is_pdf and not is_image:
+        raise HTTPException(status_code=400, detail="Only image or PDF files are supported.")
+
+    image_data_urls = []
+    truncated = False
+
+    if is_pdf:
+        try:
+            pdf_bytes = base64.b64decode(b64data)
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        except Exception:
+            raise HTTPException(status_code=400, detail="Couldn't open that PDF — it may be corrupted or password-protected.")
+
+        if len(doc) == 0:
+            doc.close()
+            raise HTTPException(status_code=422, detail="That PDF has no pages.")
+
+        truncated = len(doc) > MAX_PDF_PAGES
+        page_count = min(len(doc), MAX_PDF_PAGES)
+
+        for i in range(page_count):
+            pix = doc[i].get_pixmap(dpi=150)
+            png_b64 = base64.b64encode(pix.tobytes("png")).decode()
+            image_data_urls.append(f"data:image/png;base64,{png_b64}")
+        doc.close()
+        default_doc_type = "statement"
+    else:
+        image_data_urls.append(file_data)
+        default_doc_type = "receipt"
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    current_year = datetime.now().year
+
+    prompt = f"""You are reading {"a multi-page bank or card statement, with pages provided in order" if is_pdf else "a photo of either a single till slip/receipt or a bank/card statement"} from a South African user.
+
+Extract every distinct purchase across all provided pages as a JSON array. Each item must have exactly these fields:
+- "description": short merchant or item name (string)
+- "amount": the transaction amount in Rands as a plain number, no currency symbol or commas (number)
+- "date": the transaction date as YYYY-MM-DD. If no year is visible, assume {current_year}. If no date is visible at all, use {today}.
+- "category": exactly one of {json.dumps(EXPENSE_CATEGORIES)}
+- "type": exactly "Need" or "Want"
+
+Use these South African merchant examples as a guide for category, and apply the same reasoning to similar merchants you recognise that aren't listed:
+- Groceries: Checkers, Woolworths, Pick n Pay, Shoprite, Spar, Food Lover's Market, Boxer, USave
+- Transport: Uber, Bolt, Gautrain, MyCiti, fuel stations (Engen, Shell, Sasol, BP, Caltex, Total), tolls, parking
+- Utilities: Eskom, City Power, prepaid electricity, municipal rates/water, Telkom, Vodacom, MTN, Cell C, Rain, fibre/internet, airtime, data
+- Entertainment: Netflix, DStv, Showmax, Spotify, Ster-Kinekor, Nu Metro, gaming/app store purchases
+- Medical: Clicks pharmacy, Dis-Chem, doctor/dentist/optometrist visits, medical aid premiums (Discovery Health, Bonitas, Momentum, GEMS)
+- Loan Payment: bank loan repayments, vehicle finance (WesBank, MFC), store accounts (Edgars, Mr Price, Foschini, Truworths, Jet), credit card payments, bond/home loan instalments
+- Rent: rent paid to a landlord or property manager
+- Takeaways: McDonald's, KFC, Nando's, Steers, Debonairs, Mr D Food, Uber Eats, Romans Pizza, Chicken Licken, Wimpy
+- Other: anything that doesn't clearly fit above, e.g. bank fees, cash withdrawals, transfers
+
+Default "type" by category unless the description clearly says otherwise: Groceries, Utilities, Medical, Loan Payment, Rent, and Transport are usually "Need"; Entertainment and Takeaways are usually "Want"; for "Other", use your best judgement.
+
+Ignore subtotals, tax lines, payment method lines, and running balances — only list actual purchases or charges.
+
+Respond with ONLY a JSON object of this exact shape, nothing else, no markdown fences:
+{{"document_type": "receipt" or "statement", "transactions": [{{"description": "...", "amount": 0, "date": "YYYY-MM-DD", "category": "...", "type": "..."}}]}}"""
+    content = [{"type": "text", "text": prompt}]
+    for url in image_data_urls:
+        content.append({"type": "image_url", "image_url": {"url": url}})
+
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+        completion = client.chat.completions.create(
+            model=GROQ_VISION_MODEL,
+            messages=[{"role": "user", "content": content}],
+            temperature=0.2,
+            max_completion_tokens=4096,
+        )
+        raw = completion.choices[0].message.content or ""
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Couldn't reach the AI scanner: {str(e)}")
+
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`")
+        if raw.lower().startswith("json"):
+            raw = raw[4:].strip()
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        start, end = raw.find("{"), raw.rfind("}")
+        parsed = None
+        if start != -1 and end != -1 and end > start:
+            try:
+                parsed = json.loads(raw[start:end + 1])
+            except json.JSONDecodeError:
+                parsed = None
+        if parsed is None:
+            raise HTTPException(status_code=502, detail="Couldn't read that file clearly — try a sharper photo or a cleaner PDF.")
+
+    raw_transactions = parsed.get("transactions", []) if isinstance(parsed, dict) else []
+    document_type = parsed.get("document_type") if isinstance(parsed, dict) else None
+    if document_type not in ("receipt", "statement"):
+        document_type = default_doc_type
+
+    cleaned = []
+    for t in raw_transactions:
+        if not isinstance(t, dict):
+            continue
+        try:
+            amount = float(t.get("amount", 0))
+        except (TypeError, ValueError):
+            continue
+        if amount <= 0:
+            continue
+
+        description = str(t.get("description") or "Unknown").strip()[:100] or "Unknown"
+
+        category = t.get("category")
+        if category not in EXPENSE_CATEGORIES:
+            category = "Other"
+
+        type_ = t.get("type")
+        if type_ not in ("Need", "Want"):
+            type_ = "Need" if category in NEED_DEFAULT_CATEGORIES else "Want"
+
+        date = t.get("date")
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except (ValueError, TypeError):
+            date = today
+
+        cleaned.append({
+            "description": description,
+            "amount": round(amount, 2),
+            "date": date,
+            "category": category,
+            "type": type_,
+        })
+
+    if not cleaned:
+        raise HTTPException(status_code=422, detail="Couldn't find any transactions in that file — try a clearer photo or a different PDF.")
+
+    return {"transactions": cleaned, "document_type": document_type, "truncated": truncated}
