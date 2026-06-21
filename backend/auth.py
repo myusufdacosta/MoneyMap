@@ -38,3 +38,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         return user
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_current_advisor(user: models.User = Depends(get_current_user)):
+    if user.role != "advisor":
+        raise HTTPException(status_code=403, detail="This action requires an advisor account.")
+    return user

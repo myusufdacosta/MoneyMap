@@ -2,24 +2,32 @@ from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from database import engine, get_db, Base
+from database import engine, get_db, Base, run_lightweight_migrations
 import models, schemas
-from auth import hash_password, verify_password, create_token, get_current_user
+from auth import hash_password, verify_password, create_token, get_current_user, get_current_advisor
 from math import ceil
 from datetime import datetime, timedelta
-
 import os
 import json
 import base64
+import secrets
 from groq import Groq
 import fitz  # PyMuPDF — renders PDF pages to images server-side, since Groq's vision API only accepts images, not raw PDFs
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+# Configurable so a model rename/deprecation on Groq's side is a one-line env var
+# fix rather than a code change. meta-llama/llama-4-scout-17b-16e-instruct is
+# Groq's current lightweight vision-capable model as of this build.
 GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 EXPENSE_CATEGORIES = ["Groceries", "Transport", "Utilities", "Entertainment", "Medical", "Loan Payment", "Rent", "Takeaways", "Other"]
 NEED_DEFAULT_CATEGORIES = {"Groceries", "Transport", "Utilities", "Medical", "Loan Payment", "Rent"}
 MAX_PDF_PAGES = 6  # caps cost/latency on long statements; UI surfaces a "truncated" notice past this
+INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # excludes 0/O/1/I to avoid mistypes
+INVITE_CODE_LENGTH = 8
+INVITE_EXPIRY_DAYS = 7
+
 Base.metadata.create_all(bind=engine)
+run_lightweight_migrations()
 
 app = FastAPI(title="MoneyMap API")
 
@@ -39,7 +47,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     existing = db.query(models.User).filter(models.User.email == user.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    db_user = models.User(name=user.name, email=user.email, password=hash_password(user.password))
+    role = "advisor" if user.is_advisor else "individual"
+    db_user = models.User(name=user.name, email=user.email, password=hash_password(user.password), role=role)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
@@ -212,17 +221,16 @@ def delete_goal(id: int, db: Session = Depends(get_db), user=Depends(get_current
     return {"ok": True}
 
 # Dashboard
-@app.get("/dashboard")
-def dashboard(month: Optional[int] = None, year: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def compute_dashboard(db: Session, user_id: int, month: Optional[int] = None, year: Optional[int] = None):
     now = datetime.now()
     m = month or now.month
     y = year or now.year
     prefix = f"{y}-{str(m).zfill(2)}"
 
-    income = db.query(models.Income).filter(models.Income.user_id == user.id, models.Income.date.startswith(prefix)).all()
-    expenses = db.query(models.Expense).filter(models.Expense.user_id == user.id, models.Expense.date.startswith(prefix)).all()
-    loans = db.query(models.Loan).filter(models.Loan.user_id == user.id).all()
-    recurring = db.query(models.RecurringPayment).filter(models.RecurringPayment.user_id == user.id).all()
+    income = db.query(models.Income).filter(models.Income.user_id == user_id, models.Income.date.startswith(prefix)).all()
+    expenses = db.query(models.Expense).filter(models.Expense.user_id == user_id, models.Expense.date.startswith(prefix)).all()
+    loans = db.query(models.Loan).filter(models.Loan.user_id == user_id).all()
+    recurring = db.query(models.RecurringPayment).filter(models.RecurringPayment.user_id == user_id).all()
 
     total_income = sum(i.amount for i in income)
     total_expenses = sum(e.amount for e in expenses)
@@ -262,32 +270,30 @@ def dashboard(month: Optional[int] = None, year: Optional[int] = None, db: Sessi
         "loan_details": loan_details
     }
 
-@app.get("/financial-health", response_model=schemas.FinancialHealth)
-def financial_health(
-    month: Optional[int] = None,
-    year: Optional[int] = None,
-    db: Session = Depends(get_db),
-    user=Depends(get_current_user)
-):
+@app.get("/dashboard")
+def dashboard(month: Optional[int] = None, year: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    return compute_dashboard(db, user.id, month, year)
+
+def compute_financial_health(db: Session, user_id: int, month: Optional[int] = None, year: Optional[int] = None):
     now = datetime.now()
     m = month or now.month
     y = year or now.year
     prefix = f"{y}-{str(m).zfill(2)}"
 
     income = db.query(models.Income)\
-        .filter(models.Income.user_id == user.id, models.Income.date.startswith(prefix))\
+        .filter(models.Income.user_id == user_id, models.Income.date.startswith(prefix))\
         .all()
 
     expenses = db.query(models.Expense)\
-        .filter(models.Expense.user_id == user.id, models.Expense.date.startswith(prefix))\
+        .filter(models.Expense.user_id == user_id, models.Expense.date.startswith(prefix))\
         .all()
 
     loans = db.query(models.Loan)\
-        .filter(models.Loan.user_id == user.id)\
+        .filter(models.Loan.user_id == user_id)\
         .all()
 
     goals = db.query(models.SavingsGoal)\
-        .filter(models.SavingsGoal.user_id == user.id)\
+        .filter(models.SavingsGoal.user_id == user_id)\
         .all()
 
     total_income = sum(i.amount for i in income)
@@ -369,6 +375,16 @@ def financial_health(
         "budget_score": budget_score,
         "emergency_score": emergency_score
     }
+
+@app.get("/financial-health", response_model=schemas.FinancialHealth)
+def financial_health(
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    return compute_financial_health(db, user.id, month, year)
+
 @app.get("/quick-wins", response_model=schemas.QuickWins)
 def quick_wins(
     db: Session = Depends(get_db),
@@ -415,7 +431,7 @@ def quick_wins(
     return {
         "recommendations": recommendations
     }
-# Receipt / bank statement scanning
+
 # Receipt / bank statement scanning
 @app.post("/scan-receipt", response_model=schemas.ScanResponse)
 def scan_receipt(payload: schemas.ScanRequest, user=Depends(get_current_user)):
@@ -489,6 +505,7 @@ Ignore subtotals, tax lines, payment method lines, and running balances — only
 
 Respond with ONLY a JSON object of this exact shape, nothing else, no markdown fences:
 {{"document_type": "receipt" or "statement", "transactions": [{{"description": "...", "amount": 0, "date": "YYYY-MM-DD", "category": "...", "type": "..."}}]}}"""
+
     content = [{"type": "text", "text": prompt}]
     for url in image_data_urls:
         content.append({"type": "image_url", "image_url": {"url": url}})
@@ -568,3 +585,103 @@ Respond with ONLY a JSON object of this exact shape, nothing else, no markdown f
         raise HTTPException(status_code=422, detail="Couldn't find any transactions in that file — try a clearer photo or a different PDF.")
 
     return {"transactions": cleaned, "document_type": document_type, "truncated": truncated}
+
+# Advisor / client linking — Phase 1 of the advisor SaaS roadmap. This is
+# deliberately just the relationship plumbing: an advisor can generate an
+# invite code, a client can redeem one to link to that advisor, and the
+# advisor can see who's linked. No client financial data is exposed here —
+# that's a later phase, built on top of this link once it's verified to work.
+
+@app.post("/advisor/invite", response_model=schemas.AdvisorInviteRead)
+def create_advisor_invite(db: Session = Depends(get_db), advisor=Depends(get_current_advisor)):
+    code = "".join(secrets.choice(INVITE_CODE_CHARS) for _ in range(INVITE_CODE_LENGTH))
+    expires_at = (datetime.now() + timedelta(days=INVITE_EXPIRY_DAYS)).strftime("%Y-%m-%d")
+    invite = models.AdvisorInvite(code=code, advisor_id=advisor.id, expires_at=expires_at)
+    db.add(invite)
+    db.commit()
+    return {"code": code, "expires_at": expires_at}
+
+@app.post("/client/link-advisor")
+def link_advisor(payload: schemas.LinkAdvisorRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    if user.role == "advisor":
+        raise HTTPException(status_code=400, detail="Advisor accounts can't link to another advisor.")
+
+    existing_link = db.query(models.AdvisorClient)\
+        .filter(models.AdvisorClient.client_id == user.id, models.AdvisorClient.status == "active")\
+        .first()
+    if existing_link:
+        raise HTTPException(status_code=400, detail="This account is already linked to an advisor.")
+
+    invite = db.query(models.AdvisorInvite)\
+        .filter(models.AdvisorInvite.code == payload.code.strip().upper())\
+        .first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="That invite code wasn't found. Check it and try again.")
+    if invite.used_by_client_id is not None:
+        raise HTTPException(status_code=400, detail="That invite code has already been used.")
+    try:
+        expired = datetime.strptime(invite.expires_at, "%Y-%m-%d") < datetime.now()
+    except (ValueError, TypeError):
+        expired = True
+    if expired:
+        raise HTTPException(status_code=400, detail="That invite code has expired — ask your advisor for a new one.")
+
+    link = models.AdvisorClient(advisor_id=invite.advisor_id, client_id=user.id, status="active", created_at=datetime.now().strftime("%Y-%m-%d"))
+    db.add(link)
+    invite.used_by_client_id = user.id
+    user.role = "client"
+    db.commit()
+    return {"linked": True}
+
+def get_linked_client(client_id: int, db: Session, advisor: models.User):
+    """Confirms an active AdvisorClient link exists before any client data is
+    returned. Deliberately raises 404 rather than 403 for an unlinked client —
+    a 403 would confirm to the advisor that a given client_id exists at all,
+    which is more information than they should get for an account they have
+    no relationship with."""
+    link = db.query(models.AdvisorClient)\
+        .filter(models.AdvisorClient.advisor_id == advisor.id, models.AdvisorClient.client_id == client_id, models.AdvisorClient.status == "active")\
+        .first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Client not found.")
+    client = db.query(models.User).filter(models.User.id == client_id).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found.")
+    return client
+
+@app.get("/advisor/clients", response_model=List[schemas.AdvisorClientRead])
+def list_advisor_clients(db: Session = Depends(get_db), advisor=Depends(get_current_advisor)):
+    links = db.query(models.AdvisorClient)\
+        .filter(models.AdvisorClient.advisor_id == advisor.id, models.AdvisorClient.status == "active")\
+        .all()
+    result = []
+    for link in links:
+        client = db.query(models.User).filter(models.User.id == link.client_id).first()
+        if client:
+            health = compute_financial_health(db, client.id)
+            dash = compute_dashboard(db, client.id)
+            result.append({
+                "id": client.id,
+                "name": client.name,
+                "email": client.email,
+                "status": link.status,
+                "linked_since": link.created_at,
+                "health_score": health["overall"],
+                "total_debt": dash["total_debt"],
+            })
+    return result
+
+@app.get("/advisor/clients/{client_id}/dashboard")
+def advisor_client_dashboard(client_id: int, month: Optional[int] = None, year: Optional[int] = None, db: Session = Depends(get_db), advisor=Depends(get_current_advisor)):
+    get_linked_client(client_id, db, advisor)
+    return compute_dashboard(db, client_id, month, year)
+
+@app.get("/advisor/clients/{client_id}/financial-health", response_model=schemas.FinancialHealth)
+def advisor_client_financial_health(client_id: int, month: Optional[int] = None, year: Optional[int] = None, db: Session = Depends(get_db), advisor=Depends(get_current_advisor)):
+    get_linked_client(client_id, db, advisor)
+    return compute_financial_health(db, client_id, month, year)
+
+@app.get("/advisor/clients/{client_id}/loans", response_model=List[schemas.LoanRead])
+def advisor_client_loans(client_id: int, db: Session = Depends(get_db), advisor=Depends(get_current_advisor)):
+    get_linked_client(client_id, db, advisor)
+    return db.query(models.Loan).filter(models.Loan.user_id == client_id).all()

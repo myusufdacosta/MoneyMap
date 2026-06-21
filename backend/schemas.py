@@ -5,11 +5,13 @@ class UserCreate(BaseModel):
     name: str
     email: str
     password: str
+    is_advisor: Optional[bool] = False  # only used by /register; ignored by /login
 
 class UserRead(BaseModel):
     id: int
     name: str
     email: str
+    role: str
     class Config:
         from_attributes = True
 
@@ -17,6 +19,22 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user: UserRead
+
+class AdvisorInviteRead(BaseModel):
+    code: str
+    expires_at: str
+
+class LinkAdvisorRequest(BaseModel):
+    code: str
+
+class AdvisorClientRead(BaseModel):
+    id: int
+    name: str
+    email: str
+    status: str
+    linked_since: str
+    health_score: int
+    total_debt: float
 
 class IncomeBase(BaseModel):
     source: str

@@ -7,6 +7,23 @@ class User(Base):
     name = Column(String)
     email = Column(String, unique=True, index=True)
     password = Column(String)
+    role = Column(String, default="individual")  # individual | advisor | client
+
+class AdvisorClient(Base):
+    __tablename__ = "advisor_clients"
+    id = Column(Integer, primary_key=True, index=True)
+    advisor_id = Column(Integer, ForeignKey("users.id"))
+    client_id = Column(Integer, ForeignKey("users.id"), unique=True)  # one advisor per client in v1
+    status = Column(String, default="active")  # active | removed
+    created_at = Column(String)
+
+class AdvisorInvite(Base):
+    __tablename__ = "advisor_invites"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True)
+    advisor_id = Column(Integer, ForeignKey("users.id"))
+    expires_at = Column(String)
+    used_by_client_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
 class Income(Base):
     __tablename__ = "income"
