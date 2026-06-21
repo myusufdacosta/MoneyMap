@@ -1,5 +1,5 @@
-//const BASE = "https://moneymap-5zkm.onrender.com"
-const BASE = "http://127.0.0.1:8000"
+const BASE = "https://moneymap-5zkm.onrender.com"
+//const BASE = "http://127.0.0.1:8000"
 export const getToken = () => localStorage.getItem("token")
 export const getUser = () => JSON.parse(localStorage.getItem("user") || "null")
 export const setAuth = (token, user) => {
