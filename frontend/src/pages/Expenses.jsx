@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react"
 import { api } from "../utils/api"
+import ScanReceipt from "../components/ScanReceipt"
+import { suggestCategory } from "../utils/categorize"
 
 const CATEGORIES = ["Groceries","Transport","Utilities","Entertainment","Medical","Loan Payment","Rent","Takeaways","Other"]
 
@@ -10,6 +12,8 @@ export default function Expenses() {
   const [category, setCategory] = useState("Groceries")
   const [date, setDate] = useState(new Date().toISOString().split("T")[0])
   const [type, setType] = useState("Need")
+  const [categoryTouched, setCategoryTouched] = useState(false)
+  const [typeTouched, setTypeTouched] = useState(false)
   const [filter, setFilter] = useState("All")
   const [editing, setEditing] = useState(null)
   const [editDesc, setEditDesc] = useState("")
@@ -21,10 +25,22 @@ export default function Expenses() {
   const fetch = () => api("/expenses").then(setExpenses)
   useEffect(() => { fetch() }, [])
 
+  // Suggests category + Need/Want from the description as the person types,
+  // entirely offline — but never overwrites a category/type they've already
+  // picked deliberately for this entry.
+  const handleDescChange = (value) => {
+    setDesc(value)
+    if (categoryTouched && typeTouched) return
+    const suggestion = suggestCategory(value)
+    if (!suggestion) return
+    if (!categoryTouched) setCategory(suggestion.category)
+    if (!typeTouched) setType(suggestion.type)
+  }
+
   const add = async () => {
     if (!desc || !amount || !date) return
     await api("/expenses", { method: "POST", body: JSON.stringify({ description: desc, amount: parseFloat(amount), category, date, type }) })
-    setDesc(""); setAmount(""); fetch()
+    setDesc(""); setAmount(""); setCategoryTouched(false); setTypeTouched(false); fetch()
   }
 
   const startEdit = (e) => {
@@ -66,17 +82,19 @@ export default function Expenses() {
         </div>
       </div>
 
+      <ScanReceipt onAdded={fetch} />
+
       <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">Add expense</p>
       <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 mb-5 space-y-3">
-        <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)} />
+        <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" placeholder="Description" value={desc} onChange={e => handleDescChange(e.target.value)} />
         <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" placeholder="Amount (R)" type="number" value={amount} onChange={e => setAmount(e.target.value)} />
-        <select className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" value={category} onChange={e => setCategory(e.target.value)}>
+        <select className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" value={category} onChange={e => { setCategory(e.target.value); setCategoryTouched(true) }}>
           {CATEGORIES.map(c => <option key={c}>{c}</option>)}
         </select>
         <input className="w-full border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 dark:text-gray-100" type="date" value={date} onChange={e => setDate(e.target.value)} />
         <div className="flex gap-2">
-          <button onClick={() => setType("Need")} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Need" ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900" : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"}`}>Need</button>
-          <button onClick={() => setType("Want")} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Want" ? "bg-red-500 text-white border-red-500" : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"}`}>Want</button>
+          <button onClick={() => { setType("Need"); setTypeTouched(true) }} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Need" ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900" : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"}`}>Need</button>
+          <button onClick={() => { setType("Want"); setTypeTouched(true) }} className={`flex-1 py-2 rounded-lg text-sm font-medium border ${type === "Want" ? "bg-red-500 text-white border-red-500" : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"}`}>Want</button>
         </div>
         <button onClick={add} className="w-full bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded-lg py-2 text-sm font-medium">Add expense</button>
       </div>

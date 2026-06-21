@@ -68,7 +68,7 @@ export default function App() {
       </nav>
 
       <div className="px-4 py-5">
-        {tab === "dashboard" && <Dashboard />}
+        {tab === "dashboard" && <Dashboard goTo={setTab} />}
         {tab === "income" && <Income />}
         {tab === "expenses" && <Expenses />}
         {tab === "loans" && <Loans />}
