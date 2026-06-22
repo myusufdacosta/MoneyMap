@@ -6,6 +6,7 @@ export default function Login({ onAuth }) {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [isAdvisor, setIsAdvisor] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -18,7 +19,7 @@ export default function Login({ onAuth }) {
       const endpoint = mode === "login" ? "/login" : "/register"
       const body = mode === "login"
         ? { name: "", email, password }
-        : { name, email, password }
+        : { name, email, password, is_advisor: isAdvisor }
       const data = await api(endpoint, {
         method: "POST",
         body: JSON.stringify(body),
@@ -79,6 +80,12 @@ export default function Login({ onAuth }) {
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === "Enter" && submit()}
             />
+            {mode === "register" && (
+              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 px-1">
+                <input type="checkbox" checked={isAdvisor} onChange={e => setIsAdvisor(e.target.checked)} className="rounded" />
+                I'm a financial advisor
+              </label>
+            )}
           </div>
 
           {error && <p className="text-red-500 text-xs mt-3">{error}</p>}

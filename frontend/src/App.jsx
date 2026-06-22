@@ -9,6 +9,7 @@ import Recurring from "./pages/Recurring"
 import Goals from "./pages/Goals"
 import Budget from "./pages/Budget"
 import Strategy from "./pages/Strategy"
+import Advisor from "./pages/Advisor"
 
 export default function App() {
   const [user, setUser] = useState(getUser())
@@ -25,16 +26,26 @@ export default function App() {
 
   if (!user) return <Login onAuth={handleAuth} />
 
-  const tabs = [
-    { id: "dashboard", label: "Dashboard" },
-    { id: "income", label: "Income" },
-    { id: "expenses", label: "Expenses" },
-    { id: "loans", label: "Loans" },
-    { id: "recurring", label: "Recurring" },
-    { id: "budget", label: "Budget" },
-    { id: "goals", label: "Goals" },
-    { id: "strategy", label: "Payoff Plan" },
-  ]
+  // Advisor accounts don't track their own personal finances in v1 — they
+  // only get the client-management view. Individual/client accounts keep
+  // the full app, plus a tab to link an advisor.
+  const isAdvisor = user.role === "advisor"
+
+  const tabs = isAdvisor
+    ? [{ id: "advisor", label: "Clients" }]
+    : [
+        { id: "dashboard", label: "Dashboard" },
+        { id: "income", label: "Income" },
+        { id: "expenses", label: "Expenses" },
+        { id: "loans", label: "Loans" },
+        { id: "recurring", label: "Recurring" },
+        { id: "budget", label: "Budget" },
+        { id: "goals", label: "Goals" },
+        { id: "strategy", label: "Payoff Plan" },
+        { id: "advisor", label: "Advisor" },
+      ]
+
+  const activeTab = isAdvisor ? "advisor" : tab
 
   return (
     <div className="max-w-lg mx-auto min-h-screen bg-white dark:bg-gray-900 transition-colors">
@@ -59,7 +70,7 @@ export default function App() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex-shrink-0 py-3 px-2 text-xs font-medium transition-colors whitespace-nowrap ${
-              tab === t.id
+              activeTab === t.id
                 ? "border-b-2 border-gray-900 dark:border-gray-50 text-gray-900 dark:text-gray-50"
                 : "text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
             }`}
@@ -68,14 +79,15 @@ export default function App() {
       </nav>
 
       <div className="px-4 py-5">
-        {tab === "dashboard" && <Dashboard goTo={setTab} />}
-        {tab === "income" && <Income />}
-        {tab === "expenses" && <Expenses />}
-        {tab === "loans" && <Loans />}
-        {tab === "recurring" && <Recurring />}
-        {tab === "budget" && <Budget />}
-        {tab === "goals" && <Goals />}
-        {tab === "strategy" && <Strategy />}
+        {activeTab === "dashboard" && <Dashboard goTo={setTab} />}
+        {activeTab === "income" && <Income />}
+        {activeTab === "expenses" && <Expenses />}
+        {activeTab === "loans" && <Loans />}
+        {activeTab === "recurring" && <Recurring />}
+        {activeTab === "budget" && <Budget />}
+        {activeTab === "goals" && <Goals />}
+        {activeTab === "strategy" && <Strategy />}
+        {activeTab === "advisor" && <Advisor user={user} />}
       </div>
     </div>
   )

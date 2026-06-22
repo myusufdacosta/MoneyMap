@@ -21,7 +21,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
 EXPENSE_CATEGORIES = ["Groceries", "Transport", "Utilities", "Entertainment", "Medical", "Loan Payment", "Rent", "Takeaways", "Other"]
 NEED_DEFAULT_CATEGORIES = {"Groceries", "Transport", "Utilities", "Medical", "Loan Payment", "Rent"}
-MAX_PDF_PAGES = 6  # caps cost/latency on long statements; UI surfaces a "truncated" notice past this
+MAX_PDF_PAGES = 2  # caps cost/latency on long statements; UI surfaces a "truncated" notice past this
 INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # excludes 0/O/1/I to avoid mistypes
 INVITE_CODE_LENGTH = 8
 INVITE_EXPIRY_DAYS = 7
@@ -520,9 +520,11 @@ Respond with ONLY a JSON object of this exact shape, nothing else, no markdown f
         )
         raw = completion.choices[0].message.content or ""
     except Exception as e:
+        print(f"GROQ ERROR: {str(e)}", flush=True)
         raise HTTPException(status_code=502, detail=f"Couldn't reach the AI scanner: {str(e)}")
 
     raw = raw.strip()
+    print(f"GROQ RAW RESPONSE (first 500 chars): {raw[:500]}", flush=True)
     if raw.startswith("```"):
         raw = raw.strip("`")
         if raw.lower().startswith("json"):
