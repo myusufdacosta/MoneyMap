@@ -152,12 +152,15 @@ export default function ScanReceipt({ onAdded }) {
                 <button onClick={() => removeRow(t._id)} className="text-gray-300 dark:text-gray-600 hover:text-red-400 text-xs px-1">✕</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100"
-                  type="number"
-                  value={t.amount}
-                  onChange={e => updateRow(t._id, "amount", e.target.value)}
-                />
+                <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-700 px-2">
+                  <span className="text-sm text-gray-500 dark:text-gray-400 mr-1">R</span>
+                  <input
+                    className="flex-1 py-1.5 text-sm bg-transparent dark:text-gray-100 outline-none"
+                    type="number"
+                    value={t.amount}
+                    onChange={e => updateRow(t._id, "amount", e.target.value)}
+                  />
+                </div>
                 <input
                   className="border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-gray-100"
                   type="date"
