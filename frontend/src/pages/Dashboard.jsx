@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { api } from "../utils/api"
 import HealthScoreCard from "../components/HealthScoreCard"
 import QuickWinsCard from "../components/QuickWinsCard"
+import SpendingDonut from "../components/SpendingDonut"
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
@@ -68,6 +69,9 @@ export default function Dashboard({ goTo }) {
           )}
         </div>
       </div>
+    
+    {/* Spending donut chart */}
+      {data.total_income > 0 && <SpendingDonut data={data} />}
 
       <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">Budget leakage</p>
       <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 mb-5">
