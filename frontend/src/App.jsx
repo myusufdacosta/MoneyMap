@@ -218,4 +218,3 @@ if (onboarding === null) return (
     </div>
   )
 }
-Done
