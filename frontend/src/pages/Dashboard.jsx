@@ -11,15 +11,22 @@ export default function Dashboard({ goTo }) {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [year, setYear] = useState(now.getFullYear())
   const [data, setData] = useState(null)
+  const [prevData, setPrevData] = useState(null)
+  const [prevHealth, setPrevHealth] = useState(null)
   const [recurring, setRecurring] = useState([])
   const [health, setHealth] = useState(null)
   const [quickWins, setQuickWins] = useState(null)
   const [showUpcoming, setShowUpcoming] = useState(false)
 
+  const prevMonth = month === 1 ? 12 : month - 1
+  const prevYear = month === 1 ? year - 1 : year
+
   useEffect(() => {
     api(`/dashboard?month=${month}&year=${year}`).then(setData)
+    api(`/dashboard?month=${prevMonth}&year=${prevYear}`).then(setPrevData)
     api("/recurring").then(r => setRecurring([...r].sort((a, b) => a.day_of_month - b.day_of_month)))
     api(`/financial-health?month=${month}&year=${year}`).then(setHealth)
+    api(`/financial-health?month=${prevMonth}&year=${prevYear}`).then(setPrevHealth)
     api("/quick-wins").then(setQuickWins)
   }, [month, year])
 
@@ -34,7 +41,6 @@ export default function Dashboard({ goTo }) {
 
   return (
     <div>
-      {/* Month/year selector */}
       <div className="flex items-center gap-2 mb-5">
         <select className="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-100" value={month} onChange={e => setMonth(parseInt(e.target.value))}>
           {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
@@ -44,18 +50,26 @@ export default function Dashboard({ goTo }) {
         </select>
       </div>
 
-      {/* Health score — hero position */}
-      {health && <HealthScoreCard data={health} />}
+      {health && <HealthScoreCard data={health} prevData={prevHealth} />}
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 mb-5">
         <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Income</p>
           <p className="text-xl font-semibold text-green-700">{fmt(data.total_income)}</p>
+          {prevData && prevData.total_income > 0 && data.total_income !== prevData.total_income && (
+            <p className={`text-xs mt-0.5 ${data.total_income > prevData.total_income ? "text-green-600" : "text-red-500"}`}>
+              {data.total_income > prevData.total_income ? "↑" : "↓"} {fmt(Math.abs(data.total_income - prevData.total_income))} vs last month
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Expenses</p>
           <p className="text-xl font-semibold text-red-500">{fmt(data.total_expenses)}</p>
+          {prevData && prevData.total_expenses > 0 && data.total_expenses !== prevData.total_expenses && (
+            <p className={`text-xs mt-0.5 ${data.total_expenses < prevData.total_expenses ? "text-green-600" : "text-red-500"}`}>
+              {data.total_expenses > prevData.total_expenses ? "↑" : "↓"} {fmt(Math.abs(data.total_expenses - prevData.total_expenses))} vs last month
+            </p>
+          )}
         </div>
         <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Remaining</p>
@@ -69,8 +83,7 @@ export default function Dashboard({ goTo }) {
           )}
         </div>
       </div>
-    
-    {/* Spending donut chart */}
+
       {data.total_income > 0 && <SpendingDonut data={data} />}
 
       <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">Budget leakage</p>

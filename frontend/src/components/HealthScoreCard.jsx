@@ -26,10 +26,18 @@ const ScoreBar = ({ label, score }) => {
   )
 }
 
-export default function HealthScoreCard({ data }) {
+export default function HealthScoreCard({ data, prevData }) {
   const color = data.overall >= 75 ? "text-green-700" : data.overall >= 60 ? "text-amber-500" : "text-red-500"
   const ringColor = data.overall >= 75 ? "border-green-500" : data.overall >= 60 ? "border-amber-400" : "border-red-400"
   const diagnosis = diagnose(data)
+
+  const delta = prevData ? data.overall - prevData.overall : null
+  const deltaText = delta === null ? null
+    : delta === 0 ? "Same as last month"
+    : delta > 0 ? `↑${delta} pts vs last month`
+    : `↓${Math.abs(delta)} pts vs last month`
+  const deltaColor = delta === null || delta === 0 ? "text-gray-400"
+    : delta > 0 ? "text-green-600" : "text-red-500"
 
   return (
     <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-5 mb-5">
@@ -40,7 +48,8 @@ export default function HealthScoreCard({ data }) {
         </div>
         <div>
           <p className={`text-lg font-bold ${color}`}>{data.grade}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">{diagnosis}</p>
+          {deltaText && <p className={`text-xs font-medium ${deltaColor} mb-1`}>{deltaText}</p>}
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{diagnosis}</p>
         </div>
       </div>
       <div className="space-y-3 pt-3 border-t border-gray-100 dark:border-gray-700">
