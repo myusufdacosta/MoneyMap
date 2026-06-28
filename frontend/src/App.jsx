@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { getUser, clearAuth, getDarkMode, setDarkModePref } from "./utils/api"
+import { getUser, clearAuth, getDarkMode, setDarkModePref, api } from "./utils/api"
 import Login from "./pages/Login"
 import Dashboard from "./pages/Dashboard"
 import Income from "./pages/Income"
@@ -10,6 +10,7 @@ import Goals from "./pages/Goals"
 import Budget from "./pages/Budget"
 import Strategy from "./pages/Strategy"
 import Advisor from "./pages/Advisor"
+import Onboarding from "./pages/Onboarding"
 
 // Bottom nav icons as inline SVGs — no icon library needed
 const icons = {
@@ -65,11 +66,19 @@ export default function App() {
   const [moneyTab, setMoneyTab] = useState("expenses")
   const [debtTab, setDebtTab] = useState("loans")
   const [dark, setDark] = useState(getDarkMode())
+  const [onboarding, setOnboarding] = useState(null)
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark)
     setDarkModePref(dark)
   }, [dark])
+
+  useEffect(() => {
+    if (!user || user.role === "advisor") { setOnboarding(false); return }
+    api("/income").then(income => {
+      setOnboarding(!income || income.length === 0)
+    }).catch(() => setOnboarding(false))
+  }, [user])
 
   const handleAuth = (u) => setUser(u)
   const handleLogout = () => { clearAuth(); setUser(null) }
