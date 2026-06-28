@@ -13,7 +13,8 @@ const RULES = [
   { category: "Medical", type: "Need", keywords: ["clicks", "dis-chem", "dischem", "pharmacy", "doctor", "dentist", "discovery health", "bonitas", "momentum health", "medical aid", "gems", "optometrist", "specsavers"] },
   { category: "Loan Payment", type: "Need", keywords: ["loan", "capitec credit", "african bank", "directaxis", "wesbank", "mfc", "edgars", "mr price account", "foschini", "truworths", "jet account", "bond", "home loan", "vehicle finance", "instalment"] },
   { category: "Rent", type: "Need", keywords: ["rent", "landlord", "property management", "rental"] },
-  { category: "Takeaways", type: "Want", keywords: ["mcdonald", "kfc", "nando", "steers", "debonairs", "mr d", "mr delivery", "uber eats", "romans pizza", "chicken licken", "wimpy", "spur", "ocean basket"] },
+{ category: "Takeaways", type: "Want", keywords: ["mcdonald", "kfc", "nando", "steers", "debonairs", "mr d", "mr delivery", "uber eats", "romans pizza", "chicken licken", "wimpy", "spur", "ocean basket"] },
+  { category: "Bank Charges", type: "Need", keywords: ["service fee", "account fee", "bank charge", "card fee", "transaction fee", "atm fee", "cash handling", "monthly fee", "administration fee", "fnb fee", "absa fee", "nedbank fee", "standard bank fee", "capitec fee"] },
 ]
 
 // Returns { category, type } for the first matching keyword, or null if nothing matched.

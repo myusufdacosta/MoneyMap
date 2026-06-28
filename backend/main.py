@@ -11,16 +11,14 @@ import os
 import json
 import base64
 import secrets
-from groq import Groq
-import fitz  # PyMuPDF — renders PDF pages to images server-side, since Groq's vision API only accepts images, not raw PDFs
+import anthropic
+import fitz  # PyMuPDF — renders PDF pages to images server-side before sending to Claude
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-# Configurable so a model rename/deprecation on Groq's side is a one-line env var
-# fix rather than a code change. meta-llama/llama-4-scout-17b-16e-instruct is
-# Groq's current lightweight vision-capable model as of this build.
-GROQ_VISION_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
-EXPENSE_CATEGORIES = ["Groceries", "Transport", "Utilities", "Entertainment", "Medical", "Loan Payment", "Rent", "Takeaways", "Other"]
-NEED_DEFAULT_CATEGORIES = {"Groceries", "Transport", "Utilities", "Medical", "Loan Payment", "Rent"}
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5")
+
+EXPENSE_CATEGORIES = ["Groceries", "Transport", "Utilities", "Entertainment", "Medical", "Loan Payment", "Rent", "Takeaways", "Bank Charges", "Other"]
+NEED_DEFAULT_CATEGORIES = {"Groceries", "Transport", "Utilities", "Medical", "Loan Payment", "Rent", "Bank Charges"}
 MAX_PDF_PAGES = 2  # caps cost/latency on long statements; UI surfaces a "truncated" notice past this
 INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # excludes 0/O/1/I to avoid mistypes
 INVITE_CODE_LENGTH = 8
@@ -433,10 +431,11 @@ def quick_wins(
     }
 
 # Receipt / bank statement scanning
+# Receipt / bank statement scanning
 @app.post("/scan-receipt", response_model=schemas.ScanResponse)
 def scan_receipt(payload: schemas.ScanRequest, user=Depends(get_current_user)):
-    if not GROQ_API_KEY:
-        raise HTTPException(status_code=500, detail="Receipt scanning isn't configured on the server yet (missing GROQ_API_KEY).")
+    if not ANTHROPIC_API_KEY:
+        raise HTTPException(status_code=500, detail="Receipt scanning isn't configured on the server yet (missing ANTHROPIC_API_KEY).")
 
     file_data = payload.file
     if not file_data or not file_data.startswith("data:") or "," not in file_data:
@@ -449,7 +448,7 @@ def scan_receipt(payload: schemas.ScanRequest, user=Depends(get_current_user)):
     if not is_pdf and not is_image:
         raise HTTPException(status_code=400, detail="Only image or PDF files are supported.")
 
-    image_data_urls = []
+    image_blocks = []
     truncated = False
 
     if is_pdf:
@@ -469,11 +468,18 @@ def scan_receipt(payload: schemas.ScanRequest, user=Depends(get_current_user)):
         for i in range(page_count):
             pix = doc[i].get_pixmap(dpi=150)
             png_b64 = base64.b64encode(pix.tobytes("png")).decode()
-            image_data_urls.append(f"data:image/png;base64,{png_b64}")
+            image_blocks.append({
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": png_b64}
+            })
         doc.close()
         default_doc_type = "statement"
     else:
-        image_data_urls.append(file_data)
+        media_type = header.split(";")[0].replace("data:", "") or "image/jpeg"
+        image_blocks.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": media_type, "data": b64data}
+        })
         default_doc_type = "receipt"
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -497,8 +503,8 @@ Use these South African merchant examples as a guide for category, and apply the
 - Loan Payment: bank loan repayments, vehicle finance (WesBank, MFC), store accounts (Edgars, Mr Price, Foschini, Truworths, Jet), credit card payments, bond/home loan instalments
 - Rent: rent paid to a landlord or property manager
 - Takeaways: McDonald's, KFC, Nando's, Steers, Debonairs, Mr D Food, Uber Eats, Romans Pizza, Chicken Licken, Wimpy
-- Other: anything that doesn't clearly fit above, e.g. bank fees, cash withdrawals, transfers
-
+- Bank Charges: monthly service fees, account fees, card fees, transaction fees, ATM fees, cash handling fees, FNB/Absa/Nedbank/Standard Bank/Capitec charges, VAT on bank charges
+- Other: anything that doesn't clearly fit above, e.g. cash withdrawals, transfers to other people
 Default "type" by category unless the description clearly says otherwise: Groceries, Utilities, Medical, Loan Payment, Rent, and Transport are usually "Need"; Entertainment and Takeaways are usually "Want"; for "Other", use your best judgement.
 
 Ignore subtotals, tax lines, payment method lines, and running balances — only list actual purchases or charges.
@@ -506,23 +512,20 @@ Ignore subtotals, tax lines, payment method lines, and running balances — only
 Respond with ONLY a JSON object of this exact shape, nothing else, no markdown fences:
 {{"document_type": "receipt" or "statement", "transactions": [{{"description": "...", "amount": 0, "date": "YYYY-MM-DD", "category": "...", "type": "..."}}]}}"""
 
-    content = [{"type": "text", "text": prompt}]
-    for url in image_data_urls:
-        content.append({"type": "image_url", "image_url": {"url": url}})
-
     try:
-        client = Groq(api_key=GROQ_API_KEY)
-        completion = client.chat.completions.create(
-            model=GROQ_VISION_MODEL,
-            messages=[{"role": "user", "content": content}],
-            temperature=0.2,
-            max_completion_tokens=4096,
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        message = client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=4096,
+            messages=[{
+                "role": "user",
+                "content": image_blocks + [{"type": "text", "text": prompt}]
+            }]
         )
-        raw = completion.choices[0].message.content or ""
+        raw = message.content[0].text if message.content else ""
     except Exception as e:
-        print(f"GROQ ERROR: {str(e)}", flush=True)
+        print(f"ANTHROPIC ERROR: {str(e)}", flush=True)
         raise HTTPException(status_code=502, detail=f"Couldn't reach the AI scanner: {str(e)}")
-
     raw = raw.strip()
     print(f"GROQ RAW RESPONSE (first 500 chars): {raw[:500]}", flush=True)
     if raw.startswith("```"):

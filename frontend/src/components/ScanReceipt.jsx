@@ -1,7 +1,7 @@
 import { useState, useRef } from "react"
 import { api } from "../utils/api"
 
-const CATEGORIES = ["Groceries","Transport","Utilities","Entertainment","Medical","Loan Payment","Rent","Takeaways","Other"]
+const CATEGORIES = ["Groceries","Transport","Utilities","Entertainment","Medical","Loan Payment","Rent","Takeaways", "Bank Charges", "Other"]
 
 // Shrinks the photo client-side before it ever leaves the phone — receipts
 // don't need full camera resolution for the AI to read them, and this keeps
@@ -135,6 +135,58 @@ export default function ScanReceipt({ onAdded }) {
             That PDF has more than 6 pages — only the first 6 were scanned.
           </p>
         )}
+
+        {(() => {
+          const bankCharges = transactions.filter(t => t.category === "Bank Charges")
+          const bankChargesTotal = bankCharges.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
+          if (bankCharges.length === 0) return null
+          return (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
+                🏦 Bank charges detected: {fmt(bankChargesTotal)} across {bankCharges.length} fee{bankCharges.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          )
+        })()}
+
+        {(() => {
+          const bankCharges = transactions.filter(t => t.category === "Bank Charges")
+          const bankChargesTotal = bankCharges.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
+          if (bankCharges.length === 0) return null
+          return (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
+                🏦 Bank charges detected: {fmt(bankChargesTotal)} across {bankCharges.length} fee{bankCharges.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          )
+        })()}
+
+        {(() => {
+          const bankCharges = transactions.filter(t => t.category === "Bank Charges")
+          const bankChargesTotal = bankCharges.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
+          if (bankCharges.length === 0) return null
+          return (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
+                🏦 Bank charges detected: {fmt(bankChargesTotal)} across {bankCharges.length} fee{bankCharges.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          )
+        })()}
+
+        {(() => {
+          const bankCharges = transactions.filter(t => t.category === "Bank Charges")
+          const bankChargesTotal = bankCharges.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
+          if (bankCharges.length === 0) return null
+          return (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2 mb-3">
+              <p className="text-xs font-medium text-amber-800 dark:text-amber-400">
+                🏦 Bank charges detected: {fmt(bankChargesTotal)} across {bankCharges.length} fee{bankCharges.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          )
+        })()}
 
         {transactions.length === 0 && (
           <p className="text-xs text-gray-400 dark:text-gray-500 text-center py-4">Nothing left to add</p>

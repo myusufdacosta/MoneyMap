@@ -3,7 +3,7 @@ import { api } from "../utils/api"
 import ScanReceipt from "../components/ScanReceipt"
 import { suggestCategory } from "../utils/categorize"
 
-const CATEGORIES = ["Groceries","Transport","Utilities","Entertainment","Medical","Loan Payment","Rent","Takeaways","Other"]
+const CATEGORIES = ["Groceries","Transport","Utilities","Entertainment","Medical","Loan Payment","Rent","Takeaways","Bank Charges","Other"]
 
 export default function Expenses() {
   const [expenses, setExpenses] = useState([])
