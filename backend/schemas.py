@@ -143,6 +143,8 @@ class ScannedExpense(BaseModel):
     date: str
     category: str
     type: str
+    is_recurring: bool = False
+    recurring_day: int = 1
 
 class ScanResponse(BaseModel):
     transactions: list[ScannedExpense]

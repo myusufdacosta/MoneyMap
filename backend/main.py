@@ -510,8 +510,14 @@ Default "type" by category unless the description clearly says otherwise: Grocer
 Ignore subtotals, tax lines, payment method lines, and running balances — only list actual purchases or charges.
 
 Respond with ONLY a JSON object of this exact shape, nothing else, no markdown fences:
-{{"document_type": "receipt" or "statement", "transactions": [{{"description": "...", "amount": 0, "date": "YYYY-MM-DD", "category": "...", "type": "..."}}]}}"""
+{{"document_type": "receipt" or "statement", "transactions": [{{"description": "...", "amount": 0, "date": "YYYY-MM-DD", "category": "...", "type": "...", "is_recurring": true or false, "recurring_day": 1}}]}}
 
+For is_recurring, set to true if the transaction appears to be a fixed monthly debit order or subscription — signals include:
+- Description contains words like "Magtape Debit", "Debit Order", "Scheduled Payment", "Subscr", "Monthly", "Premium"
+- Known subscription services: Spotify, Netflix, DStv, Showmax, Apple, Google One, OpenAI, PlayStation, Gym, Insurance, Afrihost, Rain, fibre providers
+- Medical aid, funeral cover, or insurance premiums
+- Set recurring_day to the day of month from the transaction date (e.g. if date is 2026-03-04, recurring_day is 4)
+- For one-off purchases like groceries, fuel, restaurants — set is_recurring to false"""
     try:
         client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
         message = client.messages.create(
@@ -584,6 +590,8 @@ Respond with ONLY a JSON object of this exact shape, nothing else, no markdown f
             "date": date,
             "category": category,
             "type": type_,
+            "is_recurring": bool(t.get("is_recurring", False)),
+            "recurring_day": max(1, min(31, int(t.get("recurring_day") or 1))),
         })
 
     if not cleaned:

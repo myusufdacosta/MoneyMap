@@ -73,8 +73,12 @@ export default function ScanReceipt({ onAdded }) {
         setStatus("idle")
         return
       }
-      setTransactions(result.transactions.map((t, i) => ({ ...t, _id: i })))
-      setDocType(result.document_type || "receipt")
+setTransactions(result.transactions.map((t, i) => ({
+        ...t,
+        _id: i,
+        saveAs: t.is_recurring ? "recurring" : "expense"
+      })))
+            setDocType(result.document_type || "receipt")
       setTruncated(!!result.truncated)
       setStatus("review")
     } catch {
@@ -91,19 +95,30 @@ export default function ScanReceipt({ onAdded }) {
     setTransactions(rows => rows.filter(r => r._id !== id))
   }
 
-  const confirm = async () => {
+ const confirm = async () => {
     setStatus("saving")
     for (const t of transactions) {
-      await api("/expenses", {
-        method: "POST",
-        body: JSON.stringify({
-          description: t.description,
-          amount: parseFloat(t.amount) || 0,
-          category: t.category,
-          date: t.date,
-          type: t.type,
-        }),
-      })
+      if (t.saveAs === "recurring") {
+        await api("/recurring", {
+          method: "POST",
+          body: JSON.stringify({
+            name: t.description,
+            amount: parseFloat(t.amount) || 0,
+            day_of_month: t.recurring_day || 1,
+          }),
+        })
+      } else {
+        await api("/expenses", {
+          method: "POST",
+          body: JSON.stringify({
+            description: t.description,
+            amount: parseFloat(t.amount) || 0,
+            category: t.category,
+            date: t.date,
+            type: t.type,
+          }),
+        })
+      }
     }
     setStatus("idle")
     setTransactions([])
