@@ -57,6 +57,23 @@ export default function ScanReceipt({ onAdded }) {
   const [docType, setDocType] = useState("receipt")
   const [truncated, setTruncated] = useState(false)
 
+  const detectRecurring = (description) => {
+    const d = description.toLowerCase()
+    const keywords = [
+      "magtape debit", "debit order", "scheduled payment", "scheduled trf",
+      "monthly", "premium", "subscription", "subscr",
+      "spotify", "netflix", "dstv", "showmax", "apple", "google one",
+      "openai", "playstation", "xbox", "youtube",
+      "gymfee", "gym fee", "gym ", "planet fitness", "virgin active",
+      "naked insurance", "insurance", "medical aid", "discovery", "bonitas",
+      "momentum", "sygnia", "allan gray", "old mutual", "liberty",
+      "afrihost", "rain ", "telkom", "vodacom", "mtn ", "cell c",
+      "chatgpt", "adobe", "microsoft", "dropbox", "icloud",
+      "funeral", "cover", "assurance", "pf gymfee"
+    ]
+    return keywords.some(k => d.includes(k))
+  }
+
   const handleFile = async (e) => {
     const file = e.target.files?.[0]
     e.target.value = ""
@@ -73,11 +90,17 @@ export default function ScanReceipt({ onAdded }) {
         setStatus("idle")
         return
       }
-setTransactions(result.transactions.map((t, i) => ({
-        ...t,
-        _id: i,
-        saveAs: t.is_recurring ? "recurring" : "expense"
-      })))
+setTransactions(result.transactions.map((t, i) => {
+        const isRecurring = t.is_recurring || detectRecurring(t.description)
+        const day = t.recurring_day || (t.date ? parseInt(t.date.split("-")[2]) : 1)
+        return {
+          ...t,
+          _id: i,
+          is_recurring: isRecurring,
+          recurring_day: day,
+          saveAs: isRecurring ? "recurring" : "expense"
+        }
+      }))
             setDocType(result.document_type || "receipt")
       setTruncated(!!result.truncated)
       setStatus("review")
