@@ -83,7 +83,13 @@ export default function App() {
   const handleAuth = (u) => setUser(u)
   const handleLogout = () => { clearAuth(); setUser(null) }
 
-  if (!user) return <Login onAuth={handleAuth} />
+if (!user) return <Login onAuth={handleAuth} />
+if (onboarding === null) return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <p className="text-sm text-gray-400">Loading...</p>
+    </div>
+  )
+    if (onboarding) return <Onboarding onComplete={() => setOnboarding(false)} />
 
   const isAdvisor = user.role === "advisor"
 
