@@ -33,6 +33,7 @@ export default function Dashboard({ goTo }) {
 
   return (
     <div>
+      {/* Month/year selector */}
       <div className="flex items-center gap-2 mb-5">
         <select className="border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm flex-1 bg-white dark:bg-gray-700 dark:text-gray-100" value={month} onChange={e => setMonth(parseInt(e.target.value))}>
           {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
@@ -42,20 +43,24 @@ export default function Dashboard({ goTo }) {
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4">
+      {/* Health score — hero position */}
+      {health && <HealthScoreCard data={health} />}
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Income</p>
           <p className="text-xl font-semibold text-green-700">{fmt(data.total_income)}</p>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Expenses</p>
-          <p className="text-xl font-semibold text-red-600">{fmt(data.total_expenses)}</p>
+          <p className="text-xl font-semibold text-red-500">{fmt(data.total_expenses)}</p>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Remaining</p>
-          <p className={`text-xl font-semibold ${data.remaining >= 0 ? "text-green-700" : "text-red-600"}`}>{fmt(data.remaining)}</p>
+          <p className={`text-xl font-semibold ${data.remaining >= 0 ? "text-green-700" : "text-red-500"}`}>{fmt(data.remaining)}</p>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Total debt</p>
           <p className="text-xl font-semibold text-amber-600 mb-1">{fmt(data.total_debt)}</p>
           {data.total_debt > 0 && goTo && (
@@ -64,10 +69,8 @@ export default function Dashboard({ goTo }) {
         </div>
       </div>
 
-      {health && <HealthScoreCard data={health} />}
-
       <p className="text-sm font-medium text-gray-900 dark:text-gray-50 mb-3">Budget leakage</p>
-      <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 mb-6">
+      <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 mb-5">
         <div className="flex rounded-full overflow-hidden h-3 mb-3">
           <div className="bg-green-500" style={{ width: `${needsPct}%` }}></div>
           <div className="bg-red-400" style={{ width: `${100 - needsPct}%` }}></div>
@@ -75,7 +78,7 @@ export default function Dashboard({ goTo }) {
         <div className="flex justify-between text-xs">
           <span className="text-green-700 font-medium">{fmt(data.needs)} needs</span>
           <span className={`font-semibold ${leakageColor}`}>{data.leakage_pct}% leakage</span>
-          <span className="text-red-600 font-medium">{fmt(data.wants)} wants</span>
+          <span className="text-red-500 font-medium">{fmt(data.wants)} wants</span>
         </div>
       </div>
 
@@ -90,7 +93,6 @@ export default function Dashboard({ goTo }) {
             <span className="text-sm font-medium text-gray-900 dark:text-gray-50">Upcoming this month</span>
             <span className="text-xs text-gray-400 dark:text-gray-500">{showUpcoming ? "Hide ▲" : `${upcoming.length} due ▼`}</span>
           </button>
-
           {showUpcoming && (
             <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 border-t-0 rounded-b-xl overflow-hidden -mt-px">
               {upcoming.map((r, i) => (
